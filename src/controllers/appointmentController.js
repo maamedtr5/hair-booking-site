@@ -46,7 +46,7 @@ export const getAppointment = async (req, res) => {
     const { id } = req.params;
     const appointment = await prisma.appointment.findUnique({
       where: { id: parseInt(id) },
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
     res.json(appointment);
@@ -59,7 +59,7 @@ export const getAppointment = async (req, res) => {
 export const getAppointments = async (req, res) => {
   try {
     const appointments = await prisma.appointment.findMany({
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     res.json(appointments);
   } catch (err) {
@@ -74,7 +74,7 @@ export const updateAppointment = async (req, res) => {
     const updated = await prisma.appointment.update({
       where: { id: parseInt(id) },
       data: req.body,
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     res.json(updated);
   } catch (err) {
@@ -98,8 +98,8 @@ export const getAppointmentsByClient = async (req, res) => {
   try {
     const { clientId } = req.params;
     const appointments = await prisma.appointment.findMany({
-      where: { clientId: parseInt(clientId) },
-      include: { client: true, staff: true, service: true },
+      where: { booking: { clientId: parseInt(clientId) } },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     res.json(appointments);
   } catch (err) {
@@ -113,7 +113,7 @@ export const getAppointmentsByStaff = async (req, res) => {
     const { staffId } = req.params;
     const appointments = await prisma.appointment.findMany({
       where: { staffId: parseInt(staffId) },
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     res.json(appointments);
   } catch (err) {
@@ -127,7 +127,7 @@ export const getAppointmentsByDate = async (req, res) => {
     const { date } = req.params;
     const appointments = await prisma.appointment.findMany({
       where: { date: new Date(date) },
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     res.json(appointments);
   } catch (err) {
@@ -141,7 +141,7 @@ export const getAppointmentsByStatus = async (req, res) => {
     const { status } = req.params;
     const appointments = await prisma.appointment.findMany({
       where: { status: status.toUpperCase() },
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
     res.json(appointments);
   } catch (err) {
@@ -155,7 +155,7 @@ export const bulkCancelAppointments = async (req, res) => {
     const { ids } = req.body;
     const cancelledAppointments = await prisma.appointment.findMany({
       where: { id: { in: ids } },
-      include: { client: true, staff: true, service: true },
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
 
     await prisma.appointment.updateMany({
@@ -164,22 +164,22 @@ export const bulkCancelAppointments = async (req, res) => {
     });
 
     for (const appt of cancelledAppointments) {
-      if (appt.client?.email) {
+      if (appt.booking?.client?.email) {
         await sendEmail({
-          to: appt.client.email,
+          to: appt.booking.client.email,
           template: 'appointmentCancelled',
           data: {
-            clientName: appt.client.name,
+            clientName: appt.booking.client.name,
             serviceName: appt.service?.name,
             appointmentTime: appt.date,
             staffName: appt.staff?.name,
           },
         });
       }
-      if (appt.client?.phone) {
+      if (appt.booking?.client?.phone) {
         await sendAppointmentReminderSMS({
-          clientPhone: appt.client.phone,
-          clientName: appt.client.name,
+          clientPhone: appt.booking.client.phone,
+          clientName: appt.booking.client.name,
           serviceName: appt.service?.name,
           appointmentTime: appt.date,
           staffName: appt.staff?.name,
@@ -201,26 +201,26 @@ export const rescheduleAppointment = async (req, res) => {
 
     const updated = await prisma.appointment.update({
       where: { id: parseInt(id) },
-      data: { date: new Date(newDate), status: 'RESCHEDULED' },
-      include: { client: true, staff: true, service: true },
+      data: { date: new Date(newDate), status: 'RESCHEDULED' }, // ✅ now valid enum
+      include: { service: true, staff: true, booking: { include: { client: true } } },
     });
 
-    if (updated.client?.email) {
+    if (updated.booking?.client?.email) {
       await sendEmail({
-        to: updated.client.email,
+        to: updated.booking.client.email,
         template: 'appointmentRescheduled',
         data: {
-          clientName: updated.client.name,
+          clientName: updated.booking.client.name,
           serviceName: updated.service?.name,
           appointmentTime: updated.date,
           staffName: updated.staff?.name,
         },
       });
     }
-    if (updated.client?.phone) {
+    if (updated.booking?.client?.phone) {
       await sendAppointmentReminderSMS({
-        clientPhone: updated.client.phone,
-        clientName: updated.client.name,
+        clientPhone: updated.booking.client.phone,
+        clientName: updated.booking.client.name,
         serviceName: updated.service?.name,
         appointmentTime: updated.date,
         staffName: updated.staff?.name,

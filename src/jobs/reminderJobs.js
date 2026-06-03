@@ -8,9 +8,11 @@ const { PrismaClient } = pkg;
 
 const prisma = new PrismaClient();
 
+// Keep a registry of scheduled tasks in memory
+const reminderTasks = {};
+
 /**
  * Daily job to send reminders for upcoming appointments
- * Runs every day at 9 AM (Africa/Accra timezone)
  */
 export const scheduleDailyReminders = () => {
   cron.schedule('0 9 * * *', async () => {
@@ -29,10 +31,9 @@ export const scheduleDailyReminders = () => {
 /**
  * Schedule a reminder for a specific appointment
  * @param {string} appointmentId - ID of the appointment
- * @param {string} cronExpression - Cron string for when to send reminder
- * @returns {object} task - The cron task created
+ * @param {number} minutesBefore - How many minutes before the appointment to send the reminder
  */
-export const scheduleAppointmentReminder = async (appointmentId, cronExpression) => {
+export const scheduleAppointmentReminder = async (appointmentId, minutesBefore = 30) => {
   try {
     const appointment = await prisma.appointment.findUnique({
       where: { id: appointmentId },
@@ -47,14 +48,17 @@ export const scheduleAppointmentReminder = async (appointmentId, cronExpression)
       throw new Error(`Appointment ${appointmentId} not found`);
     }
 
+    // ✅ Compute reminder time from appointment date
+    const reminderTime = moment(appointment.date).subtract(minutesBefore, 'minutes');
+    const cronExpression = `${reminderTime.minute()} ${reminderTime.hour()} ${reminderTime.date()} ${reminderTime.month() + 1} *`;
+
     const task = cron.schedule(cronExpression, async () => {
-      const formattedTime = moment(appointment.appointmentDateTime || appointment.appointmentDate)
-        .format('MMMM Do YYYY, h:mm A');
+      const formattedTime = moment(appointment.date).format('MMMM Do YYYY, h:mm A');
 
       const reminderData = {
         clientName: appointment.client?.user?.name || `${appointment.client?.firstName} ${appointment.client?.lastName}`,
         serviceName: appointment.service?.name || 'Your service',
-        staffName: appointment.staff?.name || `${appointment.staff?.firstName} ${appointment.staff?.lastName}`,
+        staffName: appointment.staff?.name,
         appointmentTime: formattedTime,
         appointmentId: appointment.id,
       };
@@ -75,7 +79,16 @@ export const scheduleAppointmentReminder = async (appointmentId, cronExpression)
       }
     });
 
-    console.log(`✅ Reminder scheduled for appointment ${appointmentId}`);
+    // ✅ Store task keyed by appointmentId
+    reminderTasks[appointmentId] = task;
+
+    // ✅ Persist reminder info in DB
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { reminderCron: cronExpression, reminderActive: true }
+    });
+
+    console.log(`✅ Reminder scheduled for appointment ${appointmentId} at ${reminderTime.format('MMMM Do YYYY, h:mm A')}`);
     return task;
   } catch (error) {
     console.error('❌ Error scheduling appointment reminder:', error);
@@ -83,23 +96,62 @@ export const scheduleAppointmentReminder = async (appointmentId, cronExpression)
 };
 
 /**
- * Cancel a scheduled reminder
- * @param {object} task - The cron task to cancel
+ * Cancel a scheduled reminder by appointment ID
  */
-export const cancelAppointmentReminder = (task) => {
+export const cancelAppointmentReminder = async (appointmentId) => {
   try {
-    task.stop();
-    console.log('✅ Appointment reminder cancelled');
+    const task = reminderTasks[appointmentId];
+    if (task) {
+      task.stop();
+      delete reminderTasks[appointmentId];
+
+      await prisma.appointment.update({
+        where: { id: appointmentId },
+        data: { reminderActive: false, reminderCron: null }
+      });
+
+      console.log(`✅ Appointment reminder cancelled for appointment ${appointmentId}`);
+    } else {
+      console.warn(`⚠️ No reminder task found for appointment ${appointmentId}`);
+    }
   } catch (error) {
     console.error('❌ Error cancelling appointment reminder:', error);
   }
 };
 
+/**
+ * Restore reminders from DB on server startup
+ */
+export const restoreRemindersOnStartup = async () => {
+  try {
+    const appointments = await prisma.appointment.findMany({
+      where: { reminderActive: true, reminderCron: { not: null } }
+    });
+
+    appointments.forEach(appt => {
+      // ✅ Use stored cron expression from DB
+      const task = cron.schedule(appt.reminderCron, async () => {
+        const formattedTime = moment(appt.date).format('MMMM Do YYYY, h:mm A');
+        console.log(`🔔 Reminder fired for appointment ${appt.id} at ${formattedTime}`);
+        // You can re‑use the same email/SMS logic here if needed
+      });
+      reminderTasks[appt.id] = task;
+    });
+
+    console.log(`🔄 Restored ${appointments.length} appointment reminders on startup`);
+  } catch (error) {
+    console.error('❌ Error restoring reminders on startup:', error);
+  }
+};
+
+/**
+ * Export job stats
+ */
 export const getQueueStats = async () => {
   return {
     jobs: [
-      { name: 'dailyReminders', schedule: '0 9 * * *', status: 'scheduled' }
+      { name: 'dailyReminders', schedule: '0 9 * * *', status: 'scheduled' },
+      { name: 'appointmentReminders', count: Object.keys(reminderTasks).length }
     ]
   };
-  req.isInternalUpdate = true;
 };

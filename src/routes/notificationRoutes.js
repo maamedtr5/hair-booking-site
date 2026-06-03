@@ -1,5 +1,6 @@
 // routes/notificationRoutes.js
 import express from 'express';
+import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../auth/jwtAuth.js';
 import { verifyUserPermissions } from '../auth/auth.js';
 import {

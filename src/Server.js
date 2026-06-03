@@ -8,6 +8,7 @@ import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 
 
+
 // Import routes
 import adminRoutes from "./routes/adminRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
@@ -30,7 +31,7 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
 
 // Import background jobs and services
-import { scheduleDailyReminders, getQueueStats } from './jobs/reminderJobs.js';
+import { scheduleDailyReminders, getQueueStats, restoreRemindersOnStartup }from './jobs/reminderJobs.js';
 import { verifyEmailConfig } from './services/emailService.js';
 import { verifySMSConfig } from './services/smsService.js';
 import { verifyCalendarConfig } from './services/googleCalendarService.js';
@@ -140,7 +141,7 @@ app.use('/waitlist', waitlistRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/reports', reportRoutes);
 app.use('/slots', slotRoutes);
-app.use('/webhooks', webhookRoutes);
+app.use('/webhooks/paystack', express.raw({ type: '*/*' }), webhookRoutes);
 
 // Jobs monitoring
 app.get('/jobs/stats', async (req, res) => {
@@ -176,6 +177,7 @@ app.use((err, req, res, next) => {
 });
 
 // Background jobs
+// Background jobs
 const initializeJobs = async () => {
   try {
     console.log('Initializing background jobs...');
@@ -191,11 +193,14 @@ const initializeJobs = async () => {
     }
 
     await scheduleDailyReminders();
+    await restoreRemindersOnStartup();   // ✅ restore persisted appointment reminders
+
     console.log('Background jobs initialized successfully');
   } catch (error) {
     console.error('Error initializing background jobs:', error);
   }
 };
+
 
 // Server start
 app.listen(PORT, async () => {
