@@ -8,7 +8,7 @@ let client = null;
 const initializeTwilio = () => {
   if (!client && env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN) {
     client = twilio(env.TWILIO_ACCOUNT_SID, env.TWILIO_AUTH_TOKEN);
-    console.log('✅ Twilio client initialized');
+    console.log('  Twilio client initialized');
   }
 };
 
@@ -71,7 +71,7 @@ export const verifySMSConfig = () => {
   );
 
   if (isConfigured) {
-    console.log('✅ SMS service (Twilio) is configured');
+    console.log('  SMS service (Twilio) is configured');
     initializeTwilio();
   } else {
     console.warn('⚠️ SMS service not configured (Twilio credentials missing)');
@@ -88,7 +88,7 @@ export const sendTestSMS = async (to) => {
       to,
       message: 'Test SMS from Hair Booking! Your appointment reminder system is working correctly. 💇',
     });
-    console.log('✅ Test SMS sent successfully');
+    console.log('  Test SMS sent successfully');
   } catch (error) {
     console.error('❌ Failed to send test SMS:', error);
   }

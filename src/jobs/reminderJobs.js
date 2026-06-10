@@ -48,7 +48,7 @@ export const scheduleAppointmentReminder = async (appointmentId, minutesBefore =
       throw new Error(`Appointment ${appointmentId} not found`);
     }
 
-    // ✅ Compute reminder time from appointment date
+    //   Compute reminder time from appointment date
     const reminderTime = moment(appointment.date).subtract(minutesBefore, 'minutes');
     const cronExpression = `${reminderTime.minute()} ${reminderTime.hour()} ${reminderTime.date()} ${reminderTime.month() + 1} *`;
 
@@ -79,16 +79,16 @@ export const scheduleAppointmentReminder = async (appointmentId, minutesBefore =
       }
     });
 
-    // ✅ Store task keyed by appointmentId
+    //   Store task keyed by appointmentId
     reminderTasks[appointmentId] = task;
 
-    // ✅ Persist reminder info in DB
+    //   Persist reminder info in DB
     await prisma.appointment.update({
       where: { id: appointmentId },
       data: { reminderCron: cronExpression, reminderActive: true }
     });
 
-    console.log(`✅ Reminder scheduled for appointment ${appointmentId} at ${reminderTime.format('MMMM Do YYYY, h:mm A')}`);
+    console.log(`  Reminder scheduled for appointment ${appointmentId} at ${reminderTime.format('MMMM Do YYYY, h:mm A')}`);
     return task;
   } catch (error) {
     console.error('❌ Error scheduling appointment reminder:', error);
@@ -110,7 +110,7 @@ export const cancelAppointmentReminder = async (appointmentId) => {
         data: { reminderActive: false, reminderCron: null }
       });
 
-      console.log(`✅ Appointment reminder cancelled for appointment ${appointmentId}`);
+      console.log(`  Appointment reminder cancelled for appointment ${appointmentId}`);
     } else {
       console.warn(`⚠️ No reminder task found for appointment ${appointmentId}`);
     }
@@ -129,7 +129,7 @@ export const restoreRemindersOnStartup = async () => {
     });
 
     appointments.forEach(appt => {
-      // ✅ Use stored cron expression from DB
+      //   Use stored cron expression from DB
       const task = cron.schedule(appt.reminderCron, async () => {
         const formattedTime = moment(appt.date).format('MMMM Do YYYY, h:mm A');
         console.log(`🔔 Reminder fired for appointment ${appt.id} at ${formattedTime}`);

@@ -7,26 +7,54 @@ import {
   updateUserHandler,
   deleteUserHandler,
   register,
-  login
+  login,
+  updateGoogleTokens,
+  disconnectGoogleCalendar
 } from '../controllers/userController.js';
 import { 
   validateUserRegistration, 
   validateUserLogin, 
-  validateUserUpdate 
+  validateUserUpdate,
+  validateGoogleTokenUpdate,
+  validateGoogleDisconnect
 } from '../validators/userValidator.js';
 import { authenticate } from '../auth/authMiddleware.js';
+import { requireRole } from '../middleware/roleMiddleware.js';
 
 const router = express.Router();
 
-// Auth routes
-router.post('/register', validateUserRegistration, register);
-router.post('/login', validateUserLogin, login);
-
-// User CRUD routes
-router.post('/', createUserHandler);
-router.get('/:id', getUserHandler);
-router.get('/', getUsersHandler);
+// 👤 User CRUD routes
+router.post('/', validateUserRegistration, createUserHandler);
+router.get('/:id', authenticate, getUserHandler);
+router.get('/', authenticate, getUsersHandler);
 router.put('/:id', authenticate, validateUserUpdate, updateUserHandler);
-router.delete('/:id', deleteUserHandler);
+
+// DELETE /users/:id with ownership/admin check
+router.delete('/:id', authenticate, (req, res, next) => {
+  const userId = parseInt(req.params.id);
+  const requester = req.user; // set by authenticate middleware
+
+  // Allow if requester is ADMIN or deleting their own account
+  if (requester.role === 'ADMIN' || requester.id === userId) {
+    return deleteUserHandler(req, res, next);
+  }
+
+  return res.status(403).json({ error: 'Forbidden: not allowed to delete this user' });
+});
+
+// Google Calendar integration routes
+router.put(
+  '/:id/google/tokens',
+  authenticate,
+  validateGoogleTokenUpdate,
+  updateGoogleTokens
+);
+
+router.delete(
+  '/:id/google/disconnect',
+  authenticate,
+  validateGoogleDisconnect,
+  disconnectGoogleCalendar
+);
 
 export default router;

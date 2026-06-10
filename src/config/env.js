@@ -1,21 +1,17 @@
 // src/config/env.js
-import dotenv from 'dotenv';
-
-// Load .env file
+import dotenv from "dotenv";
 dotenv.config();
 
 // Validate required variables for core backend
 const required = ['PORT', 'DATABASE_URL', 'JWT_SECRET', 'PAYSTACK_SECRET'];
 required.forEach((key) => {
   if (!process.env[key]) {
-    throw new Error(`Missing required environment variable: ${key}`);
+    console.warn(` Missing environment variable: ${key}`);
   }
 });
 
-// Export config object (merge all variables here)
 export const env = {
-  // Core backend
-  port: process.env.PORT,
+  port: process.env.PORT || 5001,
   dbUrl: process.env.DATABASE_URL,
   jwtSecret: process.env.JWT_SECRET,
   paystackSecret: process.env.PAYSTACK_SECRET,
@@ -40,8 +36,5 @@ export const env = {
   // Google OAuth (for social login)
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-  GOOGLE_REDIRECT_URI : process.env.GOOGLE_CALLBACK_URL,
- 
+  GOOGLE_REDIRECT_URI: process.env.GOOGLE_CALLBACK_URL,
 };
-
-

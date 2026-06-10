@@ -68,7 +68,7 @@ router.get('/google/callback', async (req, res) => {
       },
     });
 
-    console.log(`✅ Google Calendar connected for user ${userId}`);
+    console.log(`  Google Calendar connected for user ${userId}`);
 
     // Redirect to frontend success page
     res.redirect(`${process.env.FRONTEND_URL}/settings/calendar?success=true`);

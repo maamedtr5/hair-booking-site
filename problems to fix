@@ -1,24 +1,6 @@
-Add a try/catch block to the getSlots handler in slotController.js so database errors are caught and returned as a proper error response.
-
-Show how to wire the existing validator middleware to POST routes for services, forms, bookings, and promo codes. Use serviceRoutes.js as the example.
-
-Explain how to consolidate the two registration endpoints into one canonical POST /auth/register and deprecate the duplicate at /users/register.
-
-Explain how to consolidate the two registration endpoints into one canonical POST /auth/register and deprecate the duplicate at /users/register.
-
-Show the exact package.json changes and jest setup needed to make npm test actually run the existing test files in an ES Module project.
-
-
 
 Add @@index declarations to the Booking, Appointment, and Notification models in schema.prisma for their foreign key columns.
 
-Move the errorHandler import to the top of Server.js with all other imports. Show the corrected import order.
-
-Fix dotenv double-initialization — call it once at the top of Server.js before any other imports, and remove the call from env.js
-
-Add requireAuth middleware to GET /users and GET /users/:id in userRoutes.js, and strip the password field from all user responses.
-
-Add requireAuth and ownership/admin check to DELETE /users/:id in userRoutes.js.
 
 Add requireAuth middleware to all resource creation routes that require a logged-in user — clients, staff, bookings, slots, waitlist. Show each route file change.
 

@@ -24,7 +24,9 @@ export async function register(req, res) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await createUser({ name, email, password: hashedPassword });
 
-    res.status(201).json({ message: 'User registered successfully', user });
+    // Strip password
+    const { password: _, ...safeUser } = user;
+    res.status(201).json({ message: 'User registered successfully', user: safeUser });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -51,7 +53,9 @@ export async function login(req, res) {
       { expiresIn: '1h' }
     );
 
-    res.json({ message: 'Login successful', token });
+    // Strip password
+    const { password: _, ...safeUser } = user;
+    res.json({ message: 'Login successful', token, user: safeUser });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -61,7 +65,8 @@ export async function login(req, res) {
 export async function createUserHandler(req, res) {
   try {
     const user = await createUser(req.body);
-    res.json(user);
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -71,7 +76,9 @@ export async function getUserHandler(req, res) {
   try {
     const user = await getUserById(parseInt(req.params.id));
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -79,7 +86,9 @@ export async function getUserHandler(req, res) {
 
 export async function getUsersHandler(req, res) {
   try {
-    res.json(await getAllUsers());
+    const users = await getAllUsers();
+    const safeUsers = users.map(({ password, ...rest }) => rest);
+    res.json(safeUsers);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -88,7 +97,8 @@ export async function getUsersHandler(req, res) {
 export async function updateUserHandler(req, res) {
   try {
     const user = await updateUser(parseInt(req.params.id), req.body);
-    res.json(user);
+    const { password: _, ...safeUser } = user;
+    res.json(safeUser);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -102,3 +112,46 @@ export async function deleteUserHandler(req, res) {
     res.status(400).json({ error: err.message });
   }
 }
+
+// 📅 Update Google tokens (OAuth callback)
+export const updateGoogleTokens = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { googleAccessToken, googleRefreshToken, googleTokenExpiry } = req.body;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: {
+        googleAccessToken,
+        googleRefreshToken,
+        googleTokenExpiry: googleTokenExpiry ? new Date(googleTokenExpiry) : null
+      }
+    });
+
+    const { password: _, ...safeUser } = updatedUser;
+    res.json({ message: 'Google tokens updated successfully', user: safeUser });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// 📅 Disconnect Google Calendar
+export const disconnectGoogleCalendar = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const updatedUser = await prisma.user.update({
+      where: { id: parseInt(id) },
+      data: {
+        googleAccessToken: null,
+        googleRefreshToken: null,
+        googleTokenExpiry: null
+      }
+    });
+
+    const { password: _, ...safeUser } = updatedUser;
+    res.json({ message: 'Google Calendar disconnected successfully', user: safeUser });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};

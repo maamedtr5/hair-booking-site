@@ -17,7 +17,7 @@ export const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // ✅ Input validation
+    //   Input validation
     if (!name || name.trim().length < 2) {
       return res.status(400).json({ error: 'Name is required and must be at least 2 characters long.' });
     }
@@ -36,10 +36,10 @@ export const register = async (req, res) => {
       data: { name, email, password: hashedPassword, role }
     });
 
-    // ✅ Exclude password from response
+    //   Exclude password from response
     const { password: _, ...safeUser } = user;
 
-    // ✅ Generate JWT token on registration
+    //   Generate JWT token on registration
     const token = jwt.sign(
       { id: user.id, role: user.role }, // payload
       process.env.JWT_SECRET,
@@ -51,7 +51,7 @@ export const register = async (req, res) => {
       token
     });
   } catch (err) {
-    // ✅ Catch Prisma unique constraint error (P2002)
+    //   Catch Prisma unique constraint error (P2002)
     if (err.code === 'P2002') {
       return res.status(409).json({ error: 'Email already exists. Please use a different email.' });
     }
@@ -76,7 +76,7 @@ export const login = async (req, res) => {
       { expiresIn: '1d' }
     );
 
-    // ✅ Exclude password from response
+    //   Exclude password from response
     const { password: _, ...safeUser } = user;
 
     res.json({ token, user: safeUser });

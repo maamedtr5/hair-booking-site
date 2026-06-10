@@ -80,7 +80,7 @@ model Appointment {
   reminderScheduled   Boolean   @default(false)
   reminderSent        Boolean   @default(false)
   reminderSentAt      DateTime?
-  reminderCron   String?   // ✅ store cron expression
+  reminderCron   String?   //   store cron expression
   reminderActive Boolean   @default(false)
 
   // Google Calendar event ID

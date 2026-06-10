@@ -22,7 +22,7 @@ const emailTemplates = {
   }),
 
   appointmentConfirmation: (data) => ({
-    subject: `✅ Appointment Confirmed - ${data.serviceName}`,
+    subject: `  Appointment Confirmed - ${data.serviceName}`,
     html: `... existing HTML confirmation template ...`,
     text: `Hi ${data.clientName}, your ${data.serviceName} appointment is confirmed for ${data.appointmentTime} with ${data.staffName}.`,
   }),
@@ -148,7 +148,7 @@ export const sendEmail = async ({ to, subject, template, data }) => {
 export const verifyEmailConfig = async () => {
   try {
     await transporter.verify();
-    console.log('✅ Email server is ready to send messages');
+    console.log('  Email server is ready to send messages');
     return true;
   } catch (error) {
     console.error('❌ Email configuration error:', error.message);
@@ -173,7 +173,7 @@ export const sendTestEmail = async (to) => {
         staffName: 'Sarah Johnson',
       },
     });
-    console.log('✅ Test email sent successfully');
+    console.log('  Test email sent successfully');
   } catch (error) {
     console.error('❌ Failed to send test email:', error);
   }

@@ -2,10 +2,13 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+ dotenv.config();
+
 import path from 'path';
 import { env } from './config/env.js';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
+
 
 
 
@@ -36,7 +39,7 @@ import { verifyEmailConfig } from './services/emailService.js';
 import { verifySMSConfig } from './services/smsService.js';
 import { verifyCalendarConfig } from './services/googleCalendarService.js';
 
-dotenv.config();
+
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -51,9 +54,17 @@ try {
   console.warn('Swagger documentation not found. Skipping API docs.');
 }
 
+
+
+app.listen(env.port, () => {
+  console.log(`Server running on port ${env.port}`);
+});
+
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+
 
 // Request logging
 app.use((req, res, next) => {
@@ -79,7 +90,7 @@ if (swaggerDocument) {
   console.log('API Documentation available at /api-docs');
 }
 
-import { errorHandler } from './utils/errorHandler.js';
+
 
 // Root route
 app.get('/', (req, res) => {
@@ -177,7 +188,7 @@ app.use((err, req, res, next) => {
 });
 
 // Background jobs
-// Background jobs
+
 const initializeJobs = async () => {
   try {
     console.log('Initializing background jobs...');
@@ -193,7 +204,7 @@ const initializeJobs = async () => {
     }
 
     await scheduleDailyReminders();
-    await restoreRemindersOnStartup();   // ✅ restore persisted appointment reminders
+    await restoreRemindersOnStartup();   //   restore persisted appointment reminders
 
     console.log('Background jobs initialized successfully');
   } catch (error) {

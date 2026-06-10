@@ -7,13 +7,49 @@ import {
   updateSlot,
   deleteSlot
 } from '../controllers/slotController.js';
+import {
+  validateSlotCreate,
+  validateSlotUpdate
+} from '../validators/slotValidator.js';
+import { authenticate } from '../auth/authMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', createSlot);
-router.get('/', getSlots);
-router.get('/:id', getSlotById);
-router.put('/:id', updateSlot);
-router.delete('/:id', deleteSlot);
+//     Create slot
+router.post(
+  '/',
+  authenticate,
+  validateSlotCreate,
+  createSlot
+);
+
+//     Get all slots
+router.get(
+  '/',
+  authenticate,
+  getSlots
+);
+
+//     Get slot by ID
+router.get(
+  '/:id',
+  authenticate,
+  getSlotById
+);
+
+//     Update slot
+router.put(
+  '/:id',
+  authenticate,
+  validateSlotUpdate,
+  updateSlot
+);
+
+//     Delete slot
+router.delete(
+  '/:id',
+  authenticate,
+  deleteSlot
+);
 
 export default router;

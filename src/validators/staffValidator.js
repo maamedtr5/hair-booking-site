@@ -1,6 +1,7 @@
 // validators/staffValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
+import { prisma } from '../lib/prisma.js';   
 
 export const validateStaffCreate = [
   body('userId')

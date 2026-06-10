@@ -169,7 +169,7 @@ export const createCalendarEvent = async (userId, appointmentData) => {
       sendUpdates: 'all', // Send email notifications to attendees
     });
 
-    console.log(`✅ Calendar event created: ${response.data.id}`);
+    console.log(`  Calendar event created: ${response.data.id}`);
     return {
       success: true,
       eventId: response.data.id,
@@ -216,7 +216,7 @@ export const updateCalendarEvent = async (userId, eventId, updates) => {
       sendUpdates: 'all',
     });
 
-    console.log(`✅ Calendar event updated: ${response.data.id}`);
+    console.log(`  Calendar event updated: ${response.data.id}`);
     return {
       success: true,
       eventId: response.data.id,
@@ -242,7 +242,7 @@ export const deleteCalendarEvent = async (userId, eventId) => {
       sendUpdates: 'all',
     });
 
-    console.log(`✅ Calendar event deleted: ${eventId}`);
+    console.log(`  Calendar event deleted: ${eventId}`);
     return { success: true };
   } catch (error) {
     console.error('❌ Error deleting calendar event:', error.message);
@@ -450,7 +450,7 @@ export const verifyCalendarConfig = () => {
   );
 
   if (isConfigured) {
-    console.log('✅ Google Calendar service is configured');
+    console.log('  Google Calendar service is configured');
   } else {
     console.warn('⚠️ Google Calendar service not configured');
     console.warn('   Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI to .env');
