@@ -5,11 +5,12 @@ import clientModel from '../models/client.js';
 export const createClient = async (req, res) => {
   try {
     const client = await clientModel.createClient(req.body);
-    res.json(client);
+    res.status(201).json(client);  
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const getClient = async (req, res) => {
   try {
@@ -20,15 +21,29 @@ export const getClient = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
-
+//   Get all clients (with skip/take pagination)
 export const getClients = async (req, res) => {
   try {
-    const clients = await clientModel.getAllClients();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const clients = await prisma.client.findMany({
+      skip,
+      take,
+      include: {
+        user: true,   
+        bookings: true, 
+      },
+    });
+
     res.json(clients);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
+
 
 export const updateClient = async (req, res) => {
   try {

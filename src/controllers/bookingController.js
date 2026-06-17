@@ -20,11 +20,12 @@ function sanitizeBooking(booking) {
 export const createBooking = async (req, res) => {
   try {
     const booking = await bookingModel.createBooking(req.body);
-    res.json(sanitizeBooking(booking));
+    res.status(201).json(sanitizeBooking(booking));   
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const getBooking = async (req, res) => {
   try {
@@ -36,14 +37,29 @@ export const getBooking = async (req, res) => {
   }
 };
 
+//   Get all bookings (with skip/take pagination)
 export const getBookings = async (req, res) => {
   try {
-    const bookings = await bookingModel.getAllBookings();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const bookings = await prisma.booking.findMany({
+      skip,
+      take,
+      include: {
+        client: true,
+        appointment: true,
+        user: true,
+      },
+    });
+
     res.json(bookings.map(sanitizeBooking));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const updateBooking = async (req, res) => {
   try {

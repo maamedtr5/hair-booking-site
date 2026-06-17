@@ -3,34 +3,43 @@ import express from 'express';
 import { 
   initializePayment, 
   markPaymentSuccess, 
-  markPaymentFailed 
+  markPaymentFailed,
+  getPayments   
 } from '../controllers/paymentController.js';
 import { authenticate, authorizeRoles } from '../auth/authMiddleware.js';
 import { validatePaymentCreate } from '../validators/paymentValidator.js';
 
 const router = express.Router();
 
-//   Initialize payment (Paystack, Cash, Mobile Money)
+// Initialize payment (Paystack, Cash, Mobile Money)
 router.post(
   '/init',
   authenticate,
-  validatePaymentCreate,   // validation wrapper added
+  validatePaymentCreate,
   initializePayment
 );
 
-//   Admin/stylist updates static payment status
+// Admin/staff updates static payment status
 router.put(
   '/:id/success',
   authenticate,
-  authorizeRoles('ADMIN', 'STYLIST'),
+  authorizeRoles('ADMIN', 'STAFF'),
   markPaymentSuccess
 );
 
 router.put(
   '/:id/failed',
   authenticate,
-  authorizeRoles('ADMIN', 'STYLIST'),
+  authorizeRoles('ADMIN', 'STAFF'),
   markPaymentFailed
+);
+
+// Get all payments (paginated)
+router.get(
+  '/',
+  authenticate,
+  authorizeRoles('ADMIN', 'STAFF'), 
+  getPayments
 );
 
 export default router;

@@ -5,7 +5,7 @@ import serviceModel from '../models/service.js';
 export const createService = async (req, res) => {
   try {
     const service = await serviceModel.createService(req.body);
-    res.json(service);
+    res.status(201).json(service);   
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -21,9 +21,22 @@ export const getService = async (req, res) => {
   }
 };
 
+//   Get all services (with skip/take pagination)
 export const getServices = async (req, res) => {
   try {
-    const services = await serviceModel.getAllServices();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const services = await prisma.service.findMany({
+      skip,
+      take,
+      include: {
+        appointments: true,   
+      },
+      orderBy: { createdAt: 'desc' }, 
+    });
+
     res.json(services);
   } catch (err) {
     res.status(400).json({ error: err.message });

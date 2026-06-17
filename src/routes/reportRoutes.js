@@ -1,4 +1,4 @@
-// src/routes/reportRoutes.js
+
 import express from 'express';
 import { 
   getRevenueReportHandler, 
@@ -8,22 +8,25 @@ import {
   validateRevenueReport, 
   validateTopServicesReport 
 } from '../validators/reportValidator.js';
-import { authenticate } from '../auth/authMiddleware.js';
+import {requireRole } from '../middleware/roleMiddleware.js';
+import { authenticate} from '../auth/authMiddleware.js'
 
 const router = express.Router();
 
-//    Revenue report (optionally filtered by date range)
+// Revenue report (optionally filtered by date range)
 router.get(
   '/revenue',
   authenticate,
+  requireRole('ADMIN'),
   validateRevenueReport,
   getRevenueReportHandler
 );
 
-//    Top services report (optionally limited)
+// Top services report (optionally limited)
 router.get(
   '/top-services',
   authenticate,
+  requireRole('ADMIN'),
   validateTopServicesReport,
   getTopServicesReportHandler
 );

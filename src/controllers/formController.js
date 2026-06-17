@@ -6,11 +6,12 @@ import formModel from '../models/form.js';
 export const createForm = async (req, res) => {
   try {
     const form = await formModel.createForm(req.body);
-    res.json(form);
+    res.status(201).json(form);  
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const getForm = async (req, res) => {
   try {
@@ -22,14 +23,28 @@ export const getForm = async (req, res) => {
   }
 };
 
+//   Get all forms (with skip/take pagination)
 export const getForms = async (req, res) => {
   try {
-    const forms = await formModel.getAllForms();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const forms = await prisma.form.findMany({
+      skip,
+      take,
+      include: {
+        client: true,   
+        booking: true,  
+      },
+    });
+
     res.json(forms);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const updateForm = async (req, res) => {
   try {

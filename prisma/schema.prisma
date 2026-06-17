@@ -76,22 +76,22 @@ model Appointment {
   status    AppointmentStatus @default(PENDING)
   notes     String?
 
-  // Reminder tracking
-  reminderScheduled   Boolean   @default(false)
-  reminderSent        Boolean   @default(false)
-  reminderSentAt      DateTime?
-  reminderCron   String?   //   store cron expression
-  reminderActive Boolean   @default(false)
+  reminderScheduled Boolean   @default(false)
+  reminderSent      Boolean   @default(false)
+  reminderSentAt    DateTime?
+  reminderCron      String?
+  reminderActive    Boolean   @default(false)
 
-  // Google Calendar event ID
-  googleEventId       String?
+  googleEventId     String?
 
   service Service  @relation(fields: [serviceId], references: [id])
   staff   Staff?   @relation(fields: [staffId], references: [id])
   booking Booking?
   slots   Slot[]
-}
 
+  @@index([serviceId])
+  @@index([staffId])
+}
 
 
 enum AppointmentStatus {
@@ -128,7 +128,12 @@ model Booking {
   promocode   Promocode?  @relation(fields: [promocodeId], references: [id])
   payment     Payment?
   form        Form?
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([promocodeId])
 }
+
 
 enum BookingStatus {
   PENDING
@@ -262,16 +267,18 @@ enum WaitlistStatus {
 }
 
 model Notification {
-  id          Int                @id @default(autoincrement())
-  userId      Int
-  message     String
-  type        NotificationType   @default(GENERAL) // e.g., APPOINTMENT, PAYMENT, PROMOTION, SYSTEM
-  status      NotificationStatus @default(QUEUED)
-  read        Boolean            @default(false)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id        Int                @id @default(autoincrement())
+  userId    Int
+  message   String
+  type      NotificationType   @default(GENERAL)
+  status    NotificationStatus @default(QUEUED)
+  read      Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
-  user      User     @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }
 
 enum NotificationType {

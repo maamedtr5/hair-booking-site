@@ -23,18 +23,31 @@ function sanitizeSlot(slot) {
 export const createSlot = async (req, res) => {
   try {
     const slot = await prisma.slot.create({ data: req.body });
-    res.json(sanitizeSlot(slot));
+    res.status(201).json(sanitizeSlot(slot));   // 👈 corrected line
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
-// Get all Slots
+
+//   Get all Slots (with skip/take pagination)
 export const getSlots = async (req, res) => {
   try {
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
     const slots = await prisma.slot.findMany({
-      include: { appointment: { include: { client: true, user: true } } }
+      skip,
+      take,
+      include: {
+        appointment: {
+          include: { client: true, user: true }
+        }
+      },
+      orderBy: { startTime: 'asc' } // optional: order by start time
     });
+
     res.json(slots.map(sanitizeSlot));
   } catch (err) {
     console.error('Error fetching slots:', err);

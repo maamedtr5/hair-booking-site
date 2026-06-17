@@ -12,12 +12,14 @@ router.post(
   '/',
   authenticate,
   requireRole('admin'),
-  validateServiceCreate,         
+  validateServiceCreate,
   serviceController.createService
 );
 
-// GET routes
+// GET /services/:id
 router.get('/:id', serviceController.getService);
+
+// GET /services (paginated via skip/take query params)
 router.get('/', serviceController.getServices);
 
 // PUT /services/:id
@@ -25,7 +27,7 @@ router.put(
   '/:id',
   authenticate,
   requireRole('admin'),
-  validateServiceUpdate,       
+  validateServiceUpdate,
   serviceController.updateService
 );
 

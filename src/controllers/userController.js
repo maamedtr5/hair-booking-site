@@ -11,7 +11,7 @@ import {
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
-// 🔐 Register new user
+//  Register new user
 export async function register(req, res) {
   try {
     const { name, email, password } = req.body;
@@ -32,7 +32,7 @@ export async function register(req, res) {
   }
 }
 
-// 🔐 Login user
+//  Login user
 export async function login(req, res) {
   try {
     const { email, password } = req.body;
@@ -46,13 +46,12 @@ export async function login(req, res) {
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid email or password' });
     }
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
-
+     
+const token = jwt.sign(
+  { id: user.id, email: user.email, role: user.role },
+  process.env.JWT_SECRET,
+  { expiresIn: '1h' }
+);
     // Strip password
     const { password: _, ...safeUser } = user;
     res.json({ message: 'Login successful', token, user: safeUser });
@@ -61,7 +60,7 @@ export async function login(req, res) {
   }
 }
 
-// 🟢 CRUD Handlers
+//  CRUD Handlers
 export async function createUserHandler(req, res) {
   try {
     const user = await createUser(req.body);
@@ -84,15 +83,26 @@ export async function getUserHandler(req, res) {
   }
 }
 
+//   Get all users (with skip/take pagination)
 export async function getUsersHandler(req, res) {
   try {
-    const users = await getAllUsers();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const users = await prisma.user.findMany({
+      skip,
+      take,
+    });
+
+    // Strip password before sending
     const safeUsers = users.map(({ password, ...rest }) => rest);
     res.json(safeUsers);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 }
+
 
 export async function updateUserHandler(req, res) {
   try {
@@ -113,7 +123,7 @@ export async function deleteUserHandler(req, res) {
   }
 }
 
-// 📅 Update Google tokens (OAuth callback)
+// Update Google tokens (OAuth callback)
 export const updateGoogleTokens = async (req, res) => {
   try {
     const { id } = req.params;
@@ -135,7 +145,7 @@ export const updateGoogleTokens = async (req, res) => {
   }
 };
 
-// 📅 Disconnect Google Calendar
+//  Disconnect Google Calendar
 export const disconnectGoogleCalendar = async (req, res) => {
   try {
     const { id } = req.params;

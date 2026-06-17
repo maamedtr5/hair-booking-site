@@ -9,7 +9,7 @@ import { authenticate } from '../auth/authMiddleware.js';
 
 const router = express.Router();
 
-//   Create new setting
+// Create new setting
 router.post(
   '/',
   authenticate,
@@ -17,28 +17,16 @@ router.post(
   settingsController.createSetting
 );
 
-//   Get setting by ID
-router.get(
-  '/:id',
-  authenticate,
-  settingsController.getSetting
-);
+// Get setting by ID
+router.get('/:id', authenticate, settingsController.getSetting);
 
-//   Get setting by key
-router.get(
-  '/key/:key',
-  authenticate,
-  settingsController.getSettingByKey
-);
+// Get setting by key
+router.get('/key/:key', authenticate, settingsController.getSettingByKey);
 
-//   Get all settings
-router.get(
-  '/',
-  authenticate,
-  settingsController.getSettings
-);
+// Get all settings (paginated via skip/take query params)
+router.get('/', authenticate, settingsController.getSettings);
 
-//   Update setting
+// Update setting
 router.put(
   '/:id',
   authenticate,
@@ -46,11 +34,7 @@ router.put(
   settingsController.updateSetting
 );
 
-//   Delete setting
-router.delete(
-  '/:id',
-  authenticate,
-  settingsController.deleteSetting
-);
+// Delete setting
+router.delete('/:id', authenticate, settingsController.deleteSetting);
 
 export default router;

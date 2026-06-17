@@ -21,14 +21,30 @@ export const getReview = async (req, res) => {
   }
 };
 
+//   Get all reviews (with skip/take pagination)
 export const getReviews = async (req, res) => {
   try {
-    const reviews = await reviewModel.getAllReviews();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const reviews = await prisma.review.findMany({
+      skip,
+      take,
+      include: {
+        client: true,     
+        staff: true,      
+        service: true,    
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
     res.json(reviews);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const updateReview = async (req, res) => {
   try {

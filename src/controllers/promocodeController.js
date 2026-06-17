@@ -5,11 +5,12 @@ import promocodeModel from '../models/promocode.js';
 export const createPromocode = async (req, res) => {
   try {
     const promocode = await promocodeModel.createPromocode(req.body);
-    res.json(promocode);
+    res.status(201).json(promocode);  
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const getPromocode = async (req, res) => {
   try {
@@ -31,9 +32,19 @@ export const getPromocodeByCode = async (req, res) => {
   }
 };
 
+//   Get all promo codes (with skip/take pagination)
 export const getPromocodes = async (req, res) => {
   try {
-    const promocodes = await promocodeModel.getAllPromocodes();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const promocodes = await prisma.promocode.findMany({
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' }, // optional: newest first
+    });
+
     res.json(promocodes);
   } catch (err) {
     res.status(400).json({ error: err.message });

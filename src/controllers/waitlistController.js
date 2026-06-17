@@ -22,7 +22,7 @@ function sanitizeWaitlist(waitlist) {
 export async function addToWaitlistHandler(req, res) {
   try {
     const waitlist = await addToWaitlist(req.body);
-    res.json(sanitizeWaitlist(waitlist));
+    res.status(201).json(sanitizeWaitlist(waitlist));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -30,7 +30,8 @@ export async function addToWaitlistHandler(req, res) {
 
 export async function getWaitlistEntryHandler(req, res) {
   try {
-    const waitlist = await getWaitlistById(parseInt(req.params.id));
+    const id = parseInt(req.params.id, 10);
+    const waitlist = await getWaitlistById(id);
     if (!waitlist) return res.status(404).json({ error: 'Entry not found' });
     res.json(sanitizeWaitlist(waitlist));
   } catch (err) {
@@ -38,9 +39,21 @@ export async function getWaitlistEntryHandler(req, res) {
   }
 }
 
+// Get all waitlist entries (with skip/take pagination)
 export async function getWaitlistEntriesHandler(req, res) {
   try {
-    const waitlists = await getAllWaitlists();
+    const skip = parseInt(req.query.skip, 10) || 0;
+    const take = parseInt(req.query.take, 10) || 10;
+
+    const waitlists = await prisma.waitlist.findMany({
+      skip,
+      take,
+      include: {
+        client: true,
+        service: true,
+      },
+    });
+
     res.json(waitlists.map(sanitizeWaitlist));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -49,7 +62,8 @@ export async function getWaitlistEntriesHandler(req, res) {
 
 export async function updateWaitlistEntryHandler(req, res) {
   try {
-    const waitlist = await updateWaitlist(parseInt(req.params.id), req.body);
+    const id = parseInt(req.params.id, 10);
+    const waitlist = await updateWaitlist(id, req.body);
     res.json(sanitizeWaitlist(waitlist));
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -58,7 +72,8 @@ export async function updateWaitlistEntryHandler(req, res) {
 
 export async function deleteWaitlistEntryHandler(req, res) {
   try {
-    await deleteWaitlistEntry(parseInt(req.params.id));
+    const id = parseInt(req.params.id, 10);
+    await deleteWaitlistEntry(id);
     res.json({ message: 'Entry deleted successfully' });
   } catch (err) {
     res.status(400).json({ error: err.message });

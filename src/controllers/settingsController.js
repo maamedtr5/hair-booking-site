@@ -31,14 +31,25 @@ export const getSettingByKey = async (req, res) => {
   }
 };
 
+//   Get all settings (with skip/take pagination)
 export const getSettings = async (req, res) => {
   try {
-    const settings = await settingsModel.getAllSettings();
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
+    const settings = await prisma.setting.findMany({
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' }, 
+    });
+
     res.json(settings);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 export const updateSetting = async (req, res) => {
   try {

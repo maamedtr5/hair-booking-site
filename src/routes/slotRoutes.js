@@ -1,4 +1,4 @@
-// src/routes/slotRoutes.js
+
 import express from 'express';
 import {
   createSlot,
@@ -15,41 +15,19 @@ import { authenticate } from '../auth/authMiddleware.js';
 
 const router = express.Router();
 
-//     Create slot
-router.post(
-  '/',
-  authenticate,
-  validateSlotCreate,
-  createSlot
-);
+// Create slot
+router.post('/', authenticate, validateSlotCreate, createSlot);
 
-//     Get all slots
-router.get(
-  '/',
-  authenticate,
-  getSlots
-);
+// Get all slots (paginated via skip/take query params)
+router.get('/', authenticate, getSlots);
 
-//     Get slot by ID
-router.get(
-  '/:id',
-  authenticate,
-  getSlotById
-);
+// Get slot by ID
+router.get('/:id', authenticate, getSlotById);
 
-//     Update slot
-router.put(
-  '/:id',
-  authenticate,
-  validateSlotUpdate,
-  updateSlot
-);
+// Update slot
+router.put('/:id', authenticate, validateSlotUpdate, updateSlot);
 
-//     Delete slot
-router.delete(
-  '/:id',
-  authenticate,
-  deleteSlot
-);
+// Delete slot
+router.delete('/:id', authenticate, deleteSlot);
 
 export default router;

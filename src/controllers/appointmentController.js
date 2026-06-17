@@ -34,7 +34,9 @@ export const createAppointment = async (req, res) => {
       });
     }
 
-    res.json(appointment);
+    
+    res.status(201).json(appointment);
+
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -55,17 +57,25 @@ export const getAppointment = async (req, res) => {
   }
 };
 
-//   Get all appointments
+//   Get all appointments (with skip/take pagination)
 export const getAppointments = async (req, res) => {
   try {
+    // Parse query params, default to skip=0, take=10
+    const skip = parseInt(req.query.skip) || 0;
+    const take = parseInt(req.query.take) || 10;
+
     const appointments = await prisma.appointment.findMany({
+      skip,
+      take,
       include: { service: true, staff: true, booking: { include: { client: true } } },
     });
+
     res.json(appointments);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
+
 
 //   Update appointment
 export const updateAppointment = async (req, res) => {
