@@ -55,6 +55,32 @@ model Client {
   reviews      Review[]
   forms        Form[]
   waitlists    Waitlist[]
+  intakeForms IntakeForm[]
+  consentForms ConsentForm[]
+}
+model IntakeForm {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id])
+  hairType  String?
+  scalpCondition String?
+  productPreference String?
+  visitReason String?
+  lastChemicalTreatment String?
+  currentProducts String?
+  goals     String?
+  allergies String?
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model ConsentForm {
+  id        Int      @id @default(autoincrement())
+  clientId  Int
+  client    Client   @relation(fields: [clientId], references: [id])
+  consentGiven Boolean
+  signature  String?
+  date       DateTime @default(now())
 }
 
 model Staff {
@@ -302,3 +328,4 @@ model Report {
   data      Json
   createdAt DateTime @default(now())
 }
+

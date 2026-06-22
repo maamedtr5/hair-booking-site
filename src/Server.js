@@ -32,6 +32,11 @@ import authRoutes from './auth/authRoutes.js';
 import slotRoutes from './routes/slotRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
+import intakeRoutes from './routes/intakeRoutes.js';
+import consentRoutes from './routes/consentRoutes.js';
+
+
+
 
 // Import background jobs and services
 import { scheduleDailyReminders, getQueueStats, restoreRemindersOnStartup }from './jobs/reminderJobs.js';
@@ -156,6 +161,8 @@ app.use('/notifications', notificationRoutes);
 app.use('/reports', reportRoutes);
 app.use('/slots', slotRoutes);
 app.use('/webhooks/paystack', express.raw({ type: '*/*' }), webhookRoutes);
+app.use('/intake', intakeRoutes);
+app.use('/consent', consentRoutes);
 
 // Jobs monitoring
 app.get('/jobs/stats', async (req, res) => {
