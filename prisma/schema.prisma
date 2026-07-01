@@ -252,9 +252,9 @@ enum DiscountType {
 
 model Service {
   id          Int      @id @default(autoincrement())
-  name        String
+  name        String    
   description String?
-  duration    Int // in minutes
+  duration    Int 
   price       Float
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())

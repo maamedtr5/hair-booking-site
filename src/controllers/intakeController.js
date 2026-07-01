@@ -1,4 +1,6 @@
-import { prisma } from '../config/prisma.js';
+import { prisma } from '../lib/prisma.js';
+
+
 
 export async function createIntakeForm(req, res) {
   try {

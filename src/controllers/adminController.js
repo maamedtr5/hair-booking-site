@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma.js';
 export const createAdminHandler = async (req, res) => {
   try {
     const admin = await prisma.admin.create({ data: req.body });
-    res.status(201).json(admin); // ✅ 201 Created for new resource
+    res.status(201).json(admin); //   201 Created for new resource
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -35,7 +35,7 @@ export const getAdminsHandler = async (req, res) => {
       skip,
       take,
       include: { user: true },
-      orderBy: { createdAt: 'desc' }, // ✅ consistent ordering
+      orderBy: { createdAt: 'desc' }, //   consistent ordering
     });
 
     res.status(200).json(admins);

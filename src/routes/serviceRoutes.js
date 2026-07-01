@@ -1,37 +1,46 @@
 // src/routes/serviceRoutes.js
 import express from 'express';
-import * as serviceController from '../controllers/serviceController.js';
+import {
+  createService,
+  getService,
+  getServices,
+  updateService,
+  deleteService,
+} from '../controllers/serviceController.js';
 import { authenticate } from '../auth/authMiddleware.js';
 import { requireRole } from '../middleware/roleMiddleware.js';
-import { validateServiceCreate, validateServiceUpdate } from '../validators/serviceValidator.js';
+import {
+  validateServiceCreate,
+  validateServiceUpdate,
+} from '../validators/serviceValidator.js';
 
 const router = express.Router();
 
-// POST /services
+// Create a new service (Admin only)
 router.post(
   '/',
   authenticate,
   requireRole('admin'),
   validateServiceCreate,
-  serviceController.createService
+  createService
 );
 
-// GET /services/:id
-router.get('/:id', serviceController.getService);
+// Get all services (supports skip/take pagination)
+router.get('/', getServices);
 
-// GET /services (paginated via skip/take query params)
-router.get('/', serviceController.getServices);
+// Get a single service by ID
+router.get('/:id', getService);
 
-// PUT /services/:id
+// Update a service (Admin only)
 router.put(
   '/:id',
   authenticate,
   requireRole('admin'),
   validateServiceUpdate,
-  serviceController.updateService
+  updateService
 );
 
-// DELETE /services/:id
-router.delete('/:id', authenticate, requireRole('admin'), serviceController.deleteService);
+// Delete a service (Admin only)
+router.delete('/:id', authenticate, requireRole('admin'), deleteService);
 
 export default router;

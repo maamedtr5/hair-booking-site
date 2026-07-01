@@ -1,4 +1,5 @@
-import { prisma } from '../config/prisma.js';
+import { prisma } from '../lib/prisma.js';
+
 
 export async function createConsentForm(req, res) {
   try {

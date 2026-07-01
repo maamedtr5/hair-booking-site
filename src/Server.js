@@ -65,10 +65,14 @@ app.listen(env.port, () => {
   console.log(`Server running on port ${env.port}`);
 });
 
+const allowedOrigins = process.env.FRONTEND_URLS.split(',');
+
 app.use(cors({
-   origin: process.env.FRONTEND_URL,
+  origin: allowedOrigins,
   credentials: true
 }));
+
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
