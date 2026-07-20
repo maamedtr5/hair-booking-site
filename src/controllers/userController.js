@@ -1,167 +1,138 @@
-// ES Module User controller
+// src/controllers/userController.js
 import { prisma } from '../lib/prisma.js';
-import {
-  createUser,
-  getUserById,
-  getUserByEmail,
-  getAllUsers,
-  updateUser,
-  deleteUser
-} from '../models/user.js';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+import { sendSuccess, sendError } from '../utils/response.js';
 
-//  Register new user
-export async function register(req, res) {
-  try {
-    const { name, email, password } = req.body;
+const stripPassword = (user) => {
+  if (!user) return user;
+  const { password, ...safe } = user;
+  return safe;
+};
 
-    const existingUser = await getUserByEmail(email);
-    if (existingUser) {
-      return res.status(400).json({ error: 'Email already registered' });
-    }
+const isSelfOrStaff = (req, targetId) =>
+  req.user.id === targetId || ['ADMIN', 'STAFF'].includes(req.user.role);
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await createUser({ name, email, password: hashedPassword });
-
-    // Strip password
-    const { password: _, ...safeUser } = user;
-    res.status(201).json({ message: 'User registered successfully', user: safeUser });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-//  Login user
-export async function login(req, res) {
-  try {
-    const { email, password } = req.body;
-
-    const user = await getUserByEmail(email);
-    if (!user) {
-      return res.status(400).json({ error: 'Invalid email or password' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid email or password' });
-    }
-     
-const token = jwt.sign(
-  { id: user.id, email: user.email, role: user.role },
-  process.env.JWT_SECRET,
-  { expiresIn: '1h' }
-);
-    // Strip password
-    const { password: _, ...safeUser } = user;
-    res.json({ message: 'Login successful', token, user: safeUser });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-//  CRUD Handlers
+// Admin-only direct account creation. `role` is accepted here deliberately
+// — this route is already gated to ADMIN by the router.
 export async function createUserHandler(req, res) {
   try {
-    const user = await createUser(req.body);
-    const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    const { name, email, password, role } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword, role: role ?? 'CLIENT' },
+    });
+    return sendSuccess(res, stripPassword(user), 201, 'User created');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err.code === 'P2002') return sendError(res, 'Email already in use', 409);
+    return sendError(res, err.message, 400);
   }
 }
 
 export async function getUserHandler(req, res) {
   try {
-    const user = await getUserById(parseInt(req.params.id));
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    const id = parseInt(req.params.id, 10);
+    if (!isSelfOrStaff(req, id)) return sendError(res, 'Forbidden', 403);
 
-    const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return sendError(res, 'User not found', 404);
+    return sendSuccess(res, stripPassword(user));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
-//   Get all users (with skip/take pagination)
+// ADMIN/STAFF only (enforced at the route level) — lists everyone.
 export async function getUsersHandler(req, res) {
   try {
-    // Parse query params, default to skip=0, take=10
-    const skip = parseInt(req.query.skip) || 0;
-    const take = parseInt(req.query.take) || 10;
-
-    const users = await prisma.user.findMany({
-      skip,
-      take,
-    });
-
-    // Strip password before sending
-    const safeUsers = users.map(({ password, ...rest }) => rest);
-    res.json(safeUsers);
+    const skip = parseInt(req.query.skip, 10) || 0;
+    const take = parseInt(req.query.take, 10) || 10;
+    const users = await prisma.user.findMany({ skip, take });
+    return sendSuccess(res, users.map(stripPassword));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
-
+// Self or admin. Role is intentionally never accepted here — see
+// updateUserRoleHandler for the only path that can change it.
 export async function updateUserHandler(req, res) {
   try {
-    const user = await updateUser(parseInt(req.params.id), req.body);
-    const { password: _, ...safeUser } = user;
-    res.json(safeUser);
+    const id = parseInt(req.params.id, 10);
+    if (!isSelfOrStaff(req, id) || (req.user.id !== id && req.user.role !== 'ADMIN')) {
+      // Staff can view others (getUserHandler) but only self/admin can edit.
+      return sendError(res, 'Forbidden', 403);
+    }
+
+    const { name, email, password } = req.body;
+    const data = {};
+    if (name !== undefined) data.name = name;
+    if (email !== undefined) data.email = email;
+    if (password !== undefined) data.password = await bcrypt.hash(password, 10);
+
+    const user = await prisma.user.update({ where: { id }, data });
+    return sendSuccess(res, stripPassword(user));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    if (err.code === 'P2002') return sendError(res, 'Email already in use', 409);
+    return sendError(res, err.message, 400);
+  }
+}
+
+// ADMIN only (enforced at route level).
+export async function updateUserRoleHandler(req, res) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const { role } = req.body;
+    if (!['ADMIN', 'STAFF', 'CLIENT'].includes(role)) {
+      return sendError(res, 'Invalid role', 400);
+    }
+    const user = await prisma.user.update({ where: { id }, data: { role } });
+    return sendSuccess(res, stripPassword(user), 200, 'Role updated');
+  } catch (err) {
+    return sendError(res, err.message, 400);
   }
 }
 
 export async function deleteUserHandler(req, res) {
   try {
-    await deleteUser(parseInt(req.params.id));
-    res.json({ message: 'User deleted successfully' });
+    const id = parseInt(req.params.id, 10);
+    await prisma.user.delete({ where: { id } });
+    return sendSuccess(res, null, 200, 'User deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
-// Update Google tokens (OAuth callback)
 export const updateGoogleTokens = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { googleAccessToken, googleRefreshToken, googleTokenExpiry } = req.body;
+    const id = parseInt(req.params.id, 10);
+    if (req.user.id !== id) return sendError(res, 'Forbidden', 403);
 
+    const { googleAccessToken, googleRefreshToken, googleTokenExpiry } = req.body;
     const updatedUser = await prisma.user.update({
-      where: { id: parseInt(id) },
+      where: { id },
       data: {
         googleAccessToken,
         googleRefreshToken,
-        googleTokenExpiry: googleTokenExpiry ? new Date(googleTokenExpiry) : null
-      }
+        googleTokenExpiry: googleTokenExpiry ? new Date(googleTokenExpiry) : null,
+      },
     });
-
-    const { password: _, ...safeUser } = updatedUser;
-    res.json({ message: 'Google tokens updated successfully', user: safeUser });
+    return sendSuccess(res, stripPassword(updatedUser), 200, 'Google tokens updated successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//  Disconnect Google Calendar
 export const disconnectGoogleCalendar = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
+    if (req.user.id !== id) return sendError(res, 'Forbidden', 403);
 
     const updatedUser = await prisma.user.update({
-      where: { id: parseInt(id) },
-      data: {
-        googleAccessToken: null,
-        googleRefreshToken: null,
-        googleTokenExpiry: null
-      }
+      where: { id },
+      data: { googleAccessToken: null, googleRefreshToken: null, googleTokenExpiry: null },
     });
-
-    const { password: _, ...safeUser } = updatedUser;
-    res.json({ message: 'Google Calendar disconnected successfully', user: safeUser });
+    return sendSuccess(res, stripPassword(updatedUser), 200, 'Google Calendar disconnected successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

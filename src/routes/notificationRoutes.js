@@ -1,6 +1,6 @@
+// src/routes/notificationRoutes.js
 import express from 'express';
-import { authenticate } from '../auth/jwtAuth.js';
-import { verifyUserPermissions } from '../auth/auth.js';
+import { authenticate } from '../auth/authMiddleware.js';
 import {
   getNotificationsHandler,
   createNotificationHandler,
@@ -9,38 +9,20 @@ import {
   getAllNotificationsHandler,
   getNotificationByIdHandler,
   updateNotificationHandler,
-  deleteNotificationHandler
+  deleteNotificationHandler,
 } from '../controllers/notificationController.js';
-import {
-  validateNotificationCreate,
-  validateNotificationUpdate,
-  validateMarkAsRead
-} from '../validators/notificationValidator.js';
+import { validateNotificationCreate, validateNotificationUpdate } from '../validators/notificationValidator.js';
 
 const router = express.Router();
 
-// Get notifications for a user
-router.get('/user/:userId', authenticate, verifyUserPermissions, getNotificationsHandler);
-
-// Create notification
+// Notifications are inherently personal — everything here stays auth-gated.
+router.get('/user/:userId', authenticate, getNotificationsHandler);
 router.post('/', authenticate, validateNotificationCreate, createNotificationHandler);
-
-// Bulk mark as read
-router.put('/bulk-mark-read', authenticate, verifyUserPermissions, bulkMarkAsReadHandler);
-
-// Mark all as read for a user
-router.put('/user/:userId/mark-all-read', authenticate, verifyUserPermissions, markAllAsReadHandler);
-
-// Get all notifications
-router.get('/', authenticate, verifyUserPermissions, getAllNotificationsHandler);
-
-// Get single notification
-router.get('/:id', authenticate, verifyUserPermissions, validateMarkAsRead, getNotificationByIdHandler);
-
-// Update notification
-router.put('/:id', authenticate, verifyUserPermissions, validateNotificationUpdate, updateNotificationHandler);
-
-// Delete notification
-router.delete('/:id', authenticate, verifyUserPermissions, validateNotificationUpdate, deleteNotificationHandler);
+router.put('/bulk-mark-read', authenticate, bulkMarkAsReadHandler);
+router.put('/user/:userId/mark-all-read', authenticate, markAllAsReadHandler);
+router.get('/', authenticate, getAllNotificationsHandler);
+router.get('/:id', authenticate, getNotificationByIdHandler);
+router.put('/:id', authenticate, validateNotificationUpdate, updateNotificationHandler);
+router.delete('/:id', authenticate, deleteNotificationHandler);
 
 export default router;

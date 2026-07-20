@@ -1,80 +1,89 @@
+// src/controllers/bookingController.js
+import { prisma } from '../lib/prisma.js'; // was missing — GET /bookings 500'd on every call
 import bookingModel from '../models/booking.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
-// Utility to strip password if client/user is included
 function sanitizeBooking(booking) {
   if (!booking) return null;
-  const safeBooking = { ...booking };
-
-  if (safeBooking.client && safeBooking.client.password) {
-    const { password, ...safeClient } = safeBooking.client;
-    safeBooking.client = safeClient;
+  const safe = { ...booking };
+  if (safe.client?.user?.password) {
+    const { password, ...safeUser } = safe.client.user;
+    safe.client = { ...safe.client, user: safeUser };
   }
-  if (safeBooking.user && safeBooking.user.password) {
-    const { password, ...safeUser } = safeBooking.user;
-    safeBooking.user = safeUser;
+  if (safe.user?.password) {
+    const { password, ...safeUser } = safe.user;
+    safe.user = safeUser;
   }
-
-  return safeBooking;
+  return safe;
 }
 
+// Staff/admin only (route-level) — manual booking for an existing appointment.
 export const createBooking = async (req, res) => {
   try {
     const booking = await bookingModel.createBooking(req.body);
-    res.status(201).json(sanitizeBooking(booking));   
+    return sendSuccess(res, sanitizeBooking(booking), 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-
+// Guest-safe lookup: owner, staff/admin, or a matching ?email=.
 export const getBooking = async (req, res) => {
   try {
-    const booking = await bookingModel.getBookingById(parseInt(req.params.id));
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-    res.json(sanitizeBooking(booking));
+    const booking = await bookingModel.getBookingById(parseInt(req.params.id, 10));
+    if (!booking) return sendError(res, 'Booking not found', 404);
+
+    const ownerEmail = booking.client?.user?.email;
+    const isOwner = req.user && booking.client?.userId === req.user.id;
+    const isStaffOrAdmin = req.user && ['ADMIN', 'STAFF'].includes(req.user.role);
+    const emailMatches =
+      req.query.email && ownerEmail && req.query.email.toLowerCase() === ownerEmail.toLowerCase();
+
+    if (!isOwner && !isStaffOrAdmin && !emailMatches) {
+      return sendError(
+        res,
+        'Not authorized to view this booking. Pass ?email= matching the booking contact email, or log in.',
+        403
+      );
+    }
+
+    return sendSuccess(res, sanitizeBooking(booking));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get all bookings (with skip/take pagination)
+// Staff/admin only (route-level).
 export const getBookings = async (req, res) => {
   try {
-    // Parse query params, default to skip=0, take=10
-    const skip = parseInt(req.query.skip) || 0;
-    const take = parseInt(req.query.take) || 10;
-
+    const skip = parseInt(req.query.skip, 10) || 0;
+    const take = parseInt(req.query.take, 10) || 10;
     const bookings = await prisma.booking.findMany({
       skip,
       take,
-      include: {
-        client: true,
-        appointment: true,
-        user: true,
-      },
+      include: { client: { include: { user: true } }, appointment: true, user: true },
+      orderBy: { createdAt: 'desc' },
     });
-
-    res.json(bookings.map(sanitizeBooking));
+    return sendSuccess(res, bookings.map(sanitizeBooking));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-
 export const updateBooking = async (req, res) => {
   try {
-    const booking = await bookingModel.updateBooking(parseInt(req.params.id), req.body);
-    res.json(sanitizeBooking(booking));
+    const booking = await bookingModel.updateBooking(parseInt(req.params.id, 10), req.body);
+    return sendSuccess(res, sanitizeBooking(booking));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const deleteBooking = async (req, res) => {
   try {
-    await bookingModel.deleteBooking(parseInt(req.params.id));
-    res.json({ message: "Booking deleted successfully" });
+    await bookingModel.deleteBooking(parseInt(req.params.id, 10));
+    return sendSuccess(res, null, 200, 'Booking deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

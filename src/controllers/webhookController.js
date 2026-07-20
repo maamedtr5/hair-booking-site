@@ -1,34 +1,44 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+// src/controllers/webhookController.js
+import crypto from 'crypto';
+import { prisma } from '../lib/prisma.js';
 
-// Paystack webhook
 export const paystackWebhook = async (req, res) => {
   try {
-    const event = req.body;
-
-    // Verify signature
-    const crypto = await import('crypto');
-    const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET)
-                       .update(JSON.stringify(req.body))
-                       .digest('hex');
-
-    if (hash !== req.headers['x-paystack-signature']) {
-      return res.status(400).json({ error: 'Invalid signature' });
+    if (!req.rawBody) {
+     
+      console.error('Missing rawBody on webhook request — check Server.js json() verify config');
+      return res.status(500).json({ success: false, message: 'Server misconfiguration' });
     }
 
-    // Update payment status
+    const expectedHash = crypto
+      .createHmac('sha512', process.env.PAYSTACK_SECRET)
+      .update(req.rawBody)
+      .digest('hex');
+
+    const signature = req.headers['x-paystack-signature'] || '';
+    const expectedBuf = Buffer.from(expectedHash, 'utf8');
+    const signatureBuf = Buffer.from(signature, 'utf8');
+
+    const isValid =
+      expectedBuf.length === signatureBuf.length &&
+      crypto.timingSafeEqual(expectedBuf, signatureBuf);
+
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: 'Invalid signature' });
+    }
+
+    const event = req.body;
     await prisma.payment.update({
       where: { transactionRef: event.data.reference },
       data: {
         status: event.event === 'charge.success' ? 'SUCCESS' : 'FAILED',
-        externalId: event.data.id,
-        metadata: event.data
-      }
+        externalId: String(event.data.id),
+        metadata: event.data,
+      },
     });
 
-    res.sendStatus(200);
+    return res.sendStatus(200);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return res.status(400).json({ success: false, message: err.message });
   }
 };
-

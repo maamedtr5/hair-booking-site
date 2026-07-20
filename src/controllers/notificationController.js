@@ -1,114 +1,135 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+// src/controllers/notificationController.js
+import { prisma } from '../lib/prisma.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
-// Create notification
+const isStaffOrAdmin = (role) => ['ADMIN', 'STAFF'].includes(role);
+
 export const createNotificationHandler = async (req, res) => {
   try {
     const { userId, message, type } = req.body;
     const notification = await prisma.notification.create({
-      data: {
-        userId: parseInt(userId, 10),
-        message,
-        type
-      }
+      data: { userId: parseInt(userId, 10), message, type },
     });
-    res.status(201).json(notification);
+    return sendSuccess(res, notification, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-// Get notifications for a user (with pagination)
 export const getNotificationsHandler = async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
+    if (req.user.id !== userId && !isStaffOrAdmin(req.user.role)) {
+      return sendError(res, 'Forbidden', 403);
+    }
     const skip = parseInt(req.query.skip, 10) || 0;
     const take = parseInt(req.query.take, 10) || 10;
-
     const notifications = await prisma.notification.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       skip,
       take,
     });
-
-    res.json(notifications);
+    return sendSuccess(res, notifications);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err.message, 500);
   }
 };
 
-// Bulk mark as read
+// Body: { ids: number[] }
 export const bulkMarkAsReadHandler = async (req, res) => {
   try {
     const { ids } = req.body;
-    await prisma.notification.updateMany({
-      where: { id: { in: ids } },
-      data: { read: true }
-    });
-    res.json({ message: 'Notifications marked as read' });
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return sendError(res, 'ids must be a non-empty array', 400);
+    }
+    if (!isStaffOrAdmin(req.user.role)) {
+      const notOwned = await prisma.notification.count({
+        where: { id: { in: ids }, userId: { not: req.user.id } },
+      });
+      if (notOwned > 0) return sendError(res, 'You can only mark your own notifications as read', 403);
+    }
+    await prisma.notification.updateMany({ where: { id: { in: ids } }, data: { read: true } });
+    return sendSuccess(res, { count: ids.length }, 200, 'Notifications marked as read');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-// Mark all as read for a user
 export const markAllAsReadHandler = async (req, res) => {
   try {
     const userId = parseInt(req.params.userId, 10);
-    await prisma.notification.updateMany({
-      where: { userId },
-      data: { read: true }
-    });
-    res.json({ message: 'All notifications marked as read' });
+    if (req.user.id !== userId && !isStaffOrAdmin(req.user.role)) {
+      return sendError(res, 'Forbidden', 403);
+    }
+    await prisma.notification.updateMany({ where: { userId }, data: { read: true } });
+    return sendSuccess(res, null, 200, 'All notifications marked as read');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-// Get all notifications
+// ADMIN/STAFF only.
 export const getAllNotificationsHandler = async (req, res) => {
   try {
-    const notifications = await prisma.notification.findMany();
-    res.json(notifications);
+    if (!isStaffOrAdmin(req.user.role)) return sendError(res, 'Forbidden', 403);
+    const skip = parseInt(req.query.skip, 10) || 0;
+    const take = parseInt(req.query.take, 10) || 10;
+    const notifications = await prisma.notification.findMany({
+      orderBy: { createdAt: 'desc' },
+      skip,
+      take,
+    });
+    return sendSuccess(res, notifications);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return sendError(res, err.message, 500);
   }
 };
 
-// Get single notification
 export const getNotificationByIdHandler = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const notification = await prisma.notification.findUnique({ where: { id } });
-    if (!notification) return res.status(404).json({ error: 'Not found' });
-    res.json(notification);
+    if (!notification) return sendError(res, 'Not found', 404);
+    if (notification.userId !== req.user.id && !isStaffOrAdmin(req.user.role)) {
+      return sendError(res, 'Forbidden', 403);
+    }
+    return sendSuccess(res, notification);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-// Update notification
+// Body: { read: boolean } — the field is `read` on the schema, not `isRead`.
 export const updateNotificationHandler = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const existing = await prisma.notification.findUnique({ where: { id } });
+    if (!existing) return sendError(res, 'Not found', 404);
+    if (existing.userId !== req.user.id && !isStaffOrAdmin(req.user.role)) {
+      return sendError(res, 'Forbidden', 403);
+    }
     const updated = await prisma.notification.update({
       where: { id },
-      data: req.body
+      data: { read: req.body.read },
     });
-    res.json(updated);
+    return sendSuccess(res, updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-// Delete notification
 export const deleteNotificationHandler = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    const existing = await prisma.notification.findUnique({ where: { id } });
+    if (!existing) return sendError(res, 'Not found', 404);
+    if (existing.userId !== req.user.id && !isStaffOrAdmin(req.user.role)) {
+      return sendError(res, 'Forbidden', 403);
+    }
     await prisma.notification.delete({ where: { id } });
-    res.json({ message: 'Notification deleted' });
+    return sendSuccess(res, null, 200, 'Notification deleted');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

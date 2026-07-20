@@ -1,325 +1,355 @@
-// controllers/appointmentController.js
+// src/controllers/appointmentController.js
 import { prisma } from '../lib/prisma.js';
-import appointmentModel from '../models/appointment.js';
 import { sendEmail } from '../services/emailService.js';
 import { sendAppointmentReminderSMS } from '../services/smsService.js';
+import { resolveClientForRequest } from '../services/guestClientService.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
-//   Create appointment
+const FULL_INCLUDE = {
+  service: true,
+  staff: { include: { user: true } },
+  booking: { include: { client: { include: { user: true } } } },
+};
+
+// Book an appointment — open to guests and logged-in clients alike.
+// Creates the Appointment + Booking together so the frontend only makes
+// one call to "book now".
 export const createAppointment = async (req, res) => {
   try {
-    const appointment = await appointmentModel.createAppointment(req.body);
+    const { serviceId, staffId, date, notes } = req.body;
+    const { clientId, contactEmail, contactPhone, contactName } =
+      await resolveClientForRequest(req);
 
-    // Confirmation email
-    if (appointment.client?.email) {
-      await sendEmail({
-        to: appointment.client.email,
-        template: 'appointmentConfirmation',
+    const result = await prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.create({
         data: {
-          clientName: appointment.client.name || `${appointment.client.firstName} ${appointment.client.lastName}`,
-          serviceName: appointment.service?.name,
-          appointmentTime: appointment.date || appointment.appointmentDateTime,
-          staffName: appointment.staff?.name,
+          serviceId: parseInt(serviceId, 10),
+          staffId: staffId ? parseInt(staffId, 10) : null,
+          date: new Date(date),
+          notes: notes ?? null,
         },
       });
-    }
-
-    // Confirmation SMS
-    if (appointment.client?.phone) {
-      await sendAppointmentReminderSMS({
-        clientPhone: appointment.client.phone,
-        clientName: appointment.client.name,
-        serviceName: appointment.service?.name,
-        appointmentTime: appointment.date || appointment.appointmentDateTime,
-        staffName: appointment.staff?.name,
+      await tx.booking.create({
+        data: { appointmentId: appointment.id, clientId },
       });
+      return tx.appointment.findUnique({
+        where: { id: appointment.id },
+        include: FULL_INCLUDE,
+      });
+    });
+
+    // Don't fail the booking if the confirmation notification fails.
+    sendEmail({
+      to: contactEmail,
+      template: 'appointmentConfirmation',
+      data: {
+        clientName: contactName,
+        serviceName: result.service?.name,
+        appointmentTime: result.date,
+        staffName: result.staff?.user?.name,
+      },
+    }).catch((err) => console.error('Confirmation email failed:', err.message));
+
+    if (contactPhone) {
+      sendAppointmentReminderSMS({
+        clientPhone: contactPhone,
+        clientName: contactName,
+        serviceName: result.service?.name,
+        appointmentTime: result.date,
+        staffName: result.staff?.user?.name,
+      }).catch((err) => console.error('Confirmation SMS failed:', err.message));
     }
 
-    
-    res.status(201).json(appointment);
-
+    return sendSuccess(
+      res,
+      { ...result, bookingReference: result.booking?.id },
+      201,
+      'Appointment booked'
+    );
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, err.status || 400);
   }
 };
 
-//   Get single appointment by ID
 export const getAppointment = async (req, res) => {
   try {
-    const { id } = req.params;
     const appointment = await prisma.appointment.findUnique({
-      where: { id: parseInt(id) },
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { id: parseInt(req.params.id, 10) },
+      include: FULL_INCLUDE,
     });
-    if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
-    res.json(appointment);
+    if (!appointment) return sendError(res, 'Appointment not found', 404);
+    return sendSuccess(res, appointment);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get all appointments (with skip/take pagination)
 export const getAppointments = async (req, res) => {
   try {
-    // Parse query params, default to skip=0, take=10
-    const skip = parseInt(req.query.skip) || 0;
-    const take = parseInt(req.query.take) || 10;
-
+    const skip = parseInt(req.query.skip, 10) || 0;
+    const take = parseInt(req.query.take, 10) || 10;
     const appointments = await prisma.appointment.findMany({
       skip,
       take,
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      include: FULL_INCLUDE,
+      orderBy: { date: 'asc' },
     });
-
-    res.json(appointments);
+    return sendSuccess(res, appointments);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-
-//   Update appointment
+// Staff/admin only (route-level).
 export const updateAppointment = async (req, res) => {
   try {
-    const { id } = req.params;
     const updated = await prisma.appointment.update({
-      where: { id: parseInt(id) },
+      where: { id: parseInt(req.params.id, 10) },
       data: req.body,
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      include: FULL_INCLUDE,
     });
-    res.json(updated);
+    return sendSuccess(res, updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Delete appointment
+// Staff/admin only. Soft-cancels rather than hard-deleting so revenue
+// reporting and history stay intact — a hard delete would also violate
+// the Booking→Appointment foreign key if a booking exists.
 export const deleteAppointment = async (req, res) => {
   try {
-    const { id } = req.params;
-    await prisma.appointment.delete({ where: { id: parseInt(id) } });
-    res.json({ message: 'Appointment deleted successfully' });
+    const id = parseInt(req.params.id, 10);
+    const result = await prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+        include: FULL_INCLUDE,
+      });
+      if (appointment.booking) {
+        await tx.booking.update({
+          where: { id: appointment.booking.id },
+          data: { status: 'CANCELLED' },
+        });
+      }
+      return appointment;
+    });
+    return sendSuccess(res, result, 200, 'Appointment cancelled');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get appointments by client ID
 export const getAppointmentsByClient = async (req, res) => {
   try {
-    const { clientId } = req.params;
+    const clientId = parseInt(req.params.clientId, 10);
+    if (req.user.role !== 'ADMIN' && req.user.role !== 'STAFF') {
+      // Clients may only fetch their own history.
+      const client = await prisma.client.findUnique({ where: { id: clientId } });
+      if (!client || client.userId !== req.user.id) return sendError(res, 'Forbidden', 403);
+    }
     const appointments = await prisma.appointment.findMany({
-      where: { booking: { clientId: parseInt(clientId) } },
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { booking: { clientId } },
+      include: FULL_INCLUDE,
+      orderBy: { date: 'desc' },
     });
-    res.json(appointments);
+    return sendSuccess(res, appointments);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get appointments by staff ID
 export const getAppointmentsByStaff = async (req, res) => {
   try {
-    const { staffId } = req.params;
+    const staffId = parseInt(req.params.staffId, 10);
     const appointments = await prisma.appointment.findMany({
-      where: { staffId: parseInt(staffId) },
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { staffId },
+      include: FULL_INCLUDE,
+      orderBy: { date: 'asc' },
     });
-    res.json(appointments);
+    return sendSuccess(res, appointments);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get appointments by date
 export const getAppointmentsByDate = async (req, res) => {
   try {
-    const { date } = req.params;
+    const start = new Date(req.params.date);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
     const appointments = await prisma.appointment.findMany({
-      where: { date: new Date(date) },
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { date: { gte: start, lt: end } },
+      include: FULL_INCLUDE,
+      orderBy: { date: 'asc' },
     });
-    res.json(appointments);
+    return sendSuccess(res, appointments);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get appointments by status
 export const getAppointmentsByStatus = async (req, res) => {
   try {
-    const { status } = req.params;
     const appointments = await prisma.appointment.findMany({
-      where: { status: status.toUpperCase() },
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { status: req.params.status.toUpperCase() },
+      include: FULL_INCLUDE,
     });
-    res.json(appointments);
+    return sendSuccess(res, appointments);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Bulk cancel appointments (with notifications)
+// Staff/admin only (route-level).
 export const bulkCancelAppointments = async (req, res) => {
   try {
-    const { ids } = req.body;
-    const cancelledAppointments = await prisma.appointment.findMany({
-      where: { id: { in: ids } },
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+    const { appointmentIds } = req.body;
+    const cancelled = await prisma.appointment.findMany({
+      where: { id: { in: appointmentIds } },
+      include: FULL_INCLUDE,
     });
 
     await prisma.appointment.updateMany({
-      where: { id: { in: ids } },
+      where: { id: { in: appointmentIds } },
+      data: { status: 'CANCELLED' },
+    });
+    await prisma.booking.updateMany({
+      where: { appointmentId: { in: appointmentIds } },
       data: { status: 'CANCELLED' },
     });
 
-    for (const appt of cancelledAppointments) {
-      if (appt.booking?.client?.email) {
-        await sendEmail({
-          to: appt.booking.client.email,
+    for (const appt of cancelled) {
+      const client = appt.booking?.client;
+      if (client?.user?.email) {
+        sendEmail({
+          to: client.user.email,
           template: 'appointmentCancelled',
           data: {
-            clientName: appt.booking.client.name,
+            clientName: client.user.name,
             serviceName: appt.service?.name,
             appointmentTime: appt.date,
-            staffName: appt.staff?.name,
+            staffName: appt.staff?.user?.name,
           },
-        });
-      }
-      if (appt.booking?.client?.phone) {
-        await sendAppointmentReminderSMS({
-          clientPhone: appt.booking.client.phone,
-          clientName: appt.booking.client.name,
-          serviceName: appt.service?.name,
-          appointmentTime: appt.date,
-          staffName: appt.staff?.name,
-        });
+        }).catch((err) => console.error('Cancellation email failed:', err.message));
       }
     }
 
-    res.json({ message: 'Appointments cancelled and clients notified', count: ids.length });
+    return sendSuccess(res, { count: appointmentIds.length }, 200, 'Appointments cancelled and clients notified');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Reschedule appointment (with notifications)
+// Guests may reschedule their own appointment via ?email= matching the
+// booking's contact email; logged-in users need to own it or be staff/admin.
 export const rescheduleAppointment = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
     const { newDate } = req.body;
 
+    const existing = await prisma.appointment.findUnique({ where: { id }, include: FULL_INCLUDE });
+    if (!existing) return sendError(res, 'Appointment not found', 404);
+
+    const ownerEmail = existing.booking?.client?.user?.email;
+    const isOwner = req.user && existing.booking?.client?.userId === req.user.id;
+    const isStaffOrAdmin = req.user && ['ADMIN', 'STAFF'].includes(req.user.role);
+    const emailMatches =
+      req.body.email && ownerEmail && req.body.email.toLowerCase() === ownerEmail.toLowerCase();
+
+    if (!isOwner && !isStaffOrAdmin && !emailMatches) {
+      return sendError(res, 'Not authorized to reschedule this appointment', 403);
+    }
+
     const updated = await prisma.appointment.update({
-      where: { id: parseInt(id) },
-      data: { date: new Date(newDate), status: 'RESCHEDULED' }, //   now valid enum
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { id },
+      data: { date: new Date(newDate), status: 'RESCHEDULED' },
+      include: FULL_INCLUDE,
     });
 
-    if (updated.booking?.client?.email) {
-      await sendEmail({
-        to: updated.booking.client.email,
+    const client = updated.booking?.client;
+    if (client?.user?.email) {
+      sendEmail({
+        to: client.user.email,
         template: 'appointmentRescheduled',
         data: {
-          clientName: updated.booking.client.name,
+          clientName: client.user.name,
           serviceName: updated.service?.name,
           appointmentTime: updated.date,
-          staffName: updated.staff?.name,
+          staffName: updated.staff?.user?.name,
         },
-      });
-    }
-    if (updated.booking?.client?.phone) {
-      await sendAppointmentReminderSMS({
-        clientPhone: updated.booking.client.phone,
-        clientName: updated.booking.client.name,
-        serviceName: updated.service?.name,
-        appointmentTime: updated.date,
-        staffName: updated.staff?.name,
-      });
+      }).catch((err) => console.error('Reschedule email failed:', err.message));
     }
 
-    res.json(updated);
+    return sendSuccess(res, updated, 200, 'Appointment rescheduled');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Internal system update (calendar sync + reminders)
+// ADMIN only. NOTE: calendar resync against googleCalendarService is
+// left as a TODO — it needs a product decision on whose connected
+// calendar an admin-created event syncs to. Reminder scheduling is
+// wired to the real reminderJobs export names (the previous version
+// referenced functions that didn't exist).
 export const internalUpdateAppointment = async (req, res) => {
   try {
-    const { id } = req.params;
-    const data = req.body;
-
+    const id = parseInt(req.params.id, 10);
     const updated = await prisma.appointment.update({
-      where: { id: parseInt(id) },
-      data,
-      include: { service: true, staff: true, booking: { include: { client: true } } },
+      where: { id },
+      data: req.body,
+      include: FULL_INCLUDE,
     });
 
-    // If date changed, resync Google Calendar
-    if (data.date && updated.googleEventId) {
-      await googleCalendarClient.events.update({
-        calendarId: process.env.GOOGLE_CALENDAR_ID,
-        eventId: updated.googleEventId,
-        resource: {
-          summary: `Hair Appointment`,
-          description: updated.notes,
-          start: { dateTime: updated.date },
-          end: { dateTime: addDuration(updated.date, updated.serviceId) }
-        }
-      });
+    if (req.body.date) {
+      const { scheduleAppointmentReminder: scheduleReminder } = await import('../jobs/reminderJobs.js');
+      await scheduleReminder(updated.id).catch((err) =>
+        console.error('Reminder reschedule failed:', err.message)
+      );
     }
+    // TODO: Google Calendar resync — see checklist item "reminder-wiring-bug".
 
-    // If date changed, reschedule reminder job
-    if (data.date) {
-      await reminderJobs.rescheduleReminder(updated.id, updated.date);
-    }
-
-    res.json(updated);
+    return sendSuccess(res, updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Schedule appointment reminder
 export const scheduleAppointmentReminder = async (req, res) => {
   try {
-    const { id } = req.params;
-    const appointment = await prisma.appointment.findUnique({ where: { id: parseInt(id) } });
+    const id = parseInt(req.params.id, 10);
+    const appointment = await prisma.appointment.findUnique({ where: { id } });
+    if (!appointment) return sendError(res, 'Appointment not found', 404);
 
-    if (!appointment) return res.status(404).json({ error: 'Appointment not found' });
+    const { scheduleAppointmentReminder: scheduleReminder } = await import('../jobs/reminderJobs.js');
+    await scheduleReminder(appointment.id);
+    await prisma.appointment.update({ where: { id }, data: { reminderScheduled: true } });
 
-    await reminderJobs.scheduleReminder(appointment.id, appointment.date);
-
-    res.json({ message: 'Reminder scheduled successfully', appointmentId: appointment.id });
+    return sendSuccess(res, { appointmentId: appointment.id }, 200, 'Reminder scheduled successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Cancel appointment reminder
 export const cancelAppointmentReminder = async (req, res) => {
   try {
-    const { id } = req.params;
-    await reminderJobs.cancelReminder(parseInt(id));
+    const id = parseInt(req.params.id, 10);
+    const { cancelAppointmentReminder: cancelReminder } = await import('../jobs/reminderJobs.js');
+    await cancelReminder(id);
+    await prisma.appointment.update({ where: { id }, data: { reminderScheduled: false } });
 
-    await prisma.appointment.update({
-      where: { id: parseInt(id) },
-      data: { reminderScheduled: false }
-    });
-
-    res.json({ message: 'Reminder cancelled successfully', appointmentId: id });
+    return sendSuccess(res, { appointmentId: id }, 200, 'Reminder cancelled successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
-//   Get reminder queue stats
 export const getQueueStats = async (req, res) => {
   try {
-    const stats = await reminderJobs.getQueueStats();
-    res.json(stats);
+    const { getQueueStats: fetchStats } = await import('../jobs/reminderJobs.js');
+    const stats = await fetchStats();
+    return sendSuccess(res, stats);
   } catch (err) {
-    res.status(400).json({ error: err.message });
-   
+    return sendError(res, err.message, 400);
   }
 };

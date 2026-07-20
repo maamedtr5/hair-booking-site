@@ -1,203 +1,332 @@
 // prisma/seed.js
+//
+// Dev/staging seed data for Locs Allure. Wipes and repopulates the tables
+// it touches, in FK-safe order — safe to re-run any time you want a clean
+// slate. DO NOT run this against a production database.
+//
+// Usage:
+//   npx prisma db seed
+// (requires the "prisma.seed" entry in package.json — see bottom of this file)
+
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
+
 const prisma = new PrismaClient();
 
+const hash = (plain) => bcrypt.hash(plain, 10);
+
+// Helper: next occurrence of a given weekday (1=Mon..6=Sat) at a given hour,
+// so seeded appointments always land inside business hours in the future.
+function nextBusinessDateTime(daysFromNow, hour) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  d.setHours(hour, 0, 0, 0);
+  return d;
+}
+
 async function main() {
-  console.log(' Seeding all models safely...');
+  console.log('Seeding Locs Allure database...\n');
 
-  // 1. Admin User
-  const adminUser = await prisma.user.upsert({
-    where: { email: 'admin1@locsallure.com' },
-    update: {},
-    create: {
-      name: 'Admin Kwame',
-      email: 'admin1@locsallure.com',
-      password: 'hashedpassword',
+  // ── 1. Clean slate (children first, respecting FKs) ──────────────────
+  await prisma.notification.deleteMany();
+  await prisma.report.deleteMany();
+  await prisma.waitlist.deleteMany();
+  await prisma.review.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.form.deleteMany();
+  await prisma.intakeForm.deleteMany();
+  await prisma.consentForm.deleteMany();
+  await prisma.booking.deleteMany();
+  await prisma.slot.deleteMany();
+  await prisma.appointment.deleteMany();
+  await prisma.promocode.deleteMany();
+  await prisma.settings.deleteMany();
+  await prisma.service.deleteMany();
+  await prisma.staff.deleteMany();
+  await prisma.client.deleteMany();
+  await prisma.admin.deleteMany();
+  await prisma.user.deleteMany();
+  console.log('✓ Cleared existing data');
+
+  // ── 2. Users + role rows ──────────────────────────────────────────────
+  const defaultPassword = await hash('Password123!');
+
+  const adminUser = await prisma.user.create({
+    data: {
+      name: 'Abena Owusu',
+      email: 'admin@locsallure.com',
+      password: defaultPassword,
       role: 'ADMIN',
-      admin: {
-        create: {
-          department: 'Management',
-          permissions: { canManageStaff: true, canViewReports: true },
-        },
-      },
+      admin: { create: { department: 'Operations', permissions: { manageUsers: true, manageBookings: true, viewReports: true } } },
     },
-    include: { admin: true },
   });
 
-  // 2. Services (createMany with skipDuplicates)
-  await prisma.service.createMany({
-    data: [
-      { name: 'Braids', description: 'Protective braiding styles', duration: 120, price: 150 },
-      { name: 'Locs Maintenance', description: 'Retwist and grooming of locs', duration: 90, price: 100 },
-      { name: 'Hair Coloring', description: 'Professional hair dye application', duration: 60, price: 80 },
-    ],
-    skipDuplicates: true,
-  });
-
-  // 3. Staff (via User)
-  const userAma = await prisma.user.upsert({
-    where: { email: 'ama.staff@locsallure.com' },
-    update: {},
-    create: {
-      name: 'Ama Mensah',
-      email: 'ama.staff@locsallure.com',
-      password: 'hashedpassword',
+  const staffUser1 = await prisma.user.create({
+    data: {
+      name: 'Efua Mensah',
+      email: 'efua.stylist@locsallure.com',
+      password: defaultPassword,
       role: 'STAFF',
-      staff: { create: { bio: 'Braiding specialist' } },
+      staff: { create: { bio: 'Loc specialist with 8 years of experience in retwisting, styling, and natural hair care.' } },
     },
     include: { staff: true },
   });
 
-  const userKojo = await prisma.user.upsert({
-    where: { email: 'kojo.staff@locsallure.com' },
-    update: {},
-    create: {
-      name: 'Kojo Owusu',
-      email: 'kojo.staff@locsallure.com',
-      password: 'hashedpassword',
+  const staffUser2 = await prisma.user.create({
+    data: {
+      name: 'Kwame Boateng',
+      email: 'kwame.stylist@locsallure.com',
+      password: defaultPassword,
       role: 'STAFF',
-      staff: { create: { bio: 'Locs maintenance expert' } },
+      staff: { create: { bio: 'Braiding and protective styles expert, known for intricate box braid patterns.' } },
     },
     include: { staff: true },
   });
 
-  // 4. Client (via User)
-  const userAbena = await prisma.user.upsert({
-    where: { email: 'abena.client@locsallure.com' },
-    update: {},
-    create: {
-      name: 'Abena Asante',
-      email: 'abena.client@locsallure.com',
-      password: 'hashedpassword',
+  const clientUser1 = await prisma.user.create({
+    data: {
+      name: 'Adjoa Asante',
+      email: 'adjoa.client@example.com',
+      password: defaultPassword,
       role: 'CLIENT',
-      client: { create: { phone: '+233555123456', address: 'Madina Estates' } },
+      client: { create: { phone: '+233241234567', address: 'Madina Estates, Accra' } },
     },
     include: { client: true },
   });
 
-  // 5. Appointment + Slot
-  const appointment = await prisma.appointment.create({
+  const clientUser2 = await prisma.user.create({
     data: {
-      serviceId: 1,
-      staffId: userAma.staff.id,
-      date: new Date('2026-07-01T10:00:00Z'),
-      status: 'CONFIRMED',
-      slots: {
-        create: {
-          startTime: new Date('2026-07-01T10:00:00Z'),
-          endTime: new Date('2026-07-01T12:00:00Z'),
-        },
+      name: 'Kojo Appiah',
+      email: 'kojo.client@example.com',
+      password: defaultPassword,
+      role: 'CLIENT',
+      client: { create: { phone: '+233209876543', address: 'East Legon, Accra' } },
+    },
+    include: { client: true },
+  });
+
+  const clientUser3 = await prisma.user.create({
+    data: {
+      name: 'Ama Darko',
+      email: 'ama.client@example.com',
+      password: defaultPassword,
+      role: 'CLIENT',
+      client: { create: { phone: '+233551122334' } },
+    },
+    include: { client: true },
+  });
+
+  console.log('✓ Created 1 admin, 2 staff, 3 clients (all passwords: Password123!)');
+
+  // ── 3. Services ────────────────────────────────────────────────────────
+  const [locRetwist, boxBraids, silkPress, deepCondition, locStarter] = await Promise.all([
+    prisma.service.create({
+      data: {
+        name: 'Loc Retwist',
+        description: 'Full retwist and style for established locs.',
+        duration: 90,
+        price: 150.0,
       },
-    },
-    include: { slots: true },
-  });
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Box Braids',
+        description: 'Protective style, medium size, shoulder length.',
+        duration: 240,
+        price: 350.0,
+      },
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Silk Press',
+        description: 'Heat styling for a smooth, silky finish on natural hair.',
+        duration: 120,
+        price: 200.0,
+      },
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Deep Conditioning Treatment',
+        description: 'Moisture-restoring treatment for dry or damaged hair.',
+        duration: 60,
+        price: 100.0,
+      },
+    }),
+    prisma.service.create({
+      data: {
+        name: 'Loc Starter (Sisterlocks)',
+        description: 'Consultation and installation for new sisterlocks.',
+        duration: 300,
+        price: 600.0,
+      },
+    }),
+  ]);
+  console.log('✓ Created 5 services');
 
-  // 6. Booking
-  const booking = await prisma.booking.create({
+  // ── 4. Appointments + Bookings (a spread of statuses) ─────────────────
+  const appt1 = await prisma.appointment.create({
     data: {
-      appointmentId: appointment.id,
-      clientId: userAbena.client.id,
+      serviceId: locRetwist.id,
+      staffId: staffUser1.staff.id,
+      date: nextBusinessDateTime(3, 10),
       status: 'CONFIRMED',
+      notes: 'Prefers medium-tension retwist.',
     },
   });
-
-  // 7. Payment
+  const booking1 = await prisma.booking.create({
+    data: { appointmentId: appt1.id, clientId: clientUser1.client.id, userId: clientUser1.id, status: 'CONFIRMED' },
+  });
   await prisma.payment.create({
     data: {
-      bookingId: booking.id,
-      amount: 150,
+      bookingId: booking1.id,
+      amount: locRetwist.price,
       currency: 'GHS',
       method: 'MOBILE_MONEY',
       provider: 'PAYSTACK',
       status: 'SUCCESS',
-      transactionRef: 'TXN123456',
-      externalId: 'PAYSTACK_ABC123',
+      transactionRef: 'seed_txn_001',
     },
   });
 
-  // 8. Review
-  await prisma.review.create({
+  const appt2 = await prisma.appointment.create({
     data: {
-      clientId: userAbena.client.id,
-      serviceId: 1,
-      staffId: userAma.staff.id,
-      rating: 5,
-      comment: 'Ama did an amazing job with my braids!',
-    },
-  });
-
-  // 9. Promocode (upsert)
-  await prisma.promocode.upsert({
-    where: { code: 'WELCOME10' },
-    update: {},
-    create: {
-      code: 'WELCOME10',
-      description: '10% off first booking',
-      discount: 10,
-      type: 'PERCENTAGE',
-      validFrom: new Date('2026-07-01T00:00:00Z'),
-      validUntil: new Date('2026-12-31T23:59:59Z'),
-      isActive: true,
-    },
-  });
-
-  // 10. Notification
-  await prisma.notification.create({
-    data: {
-      userId: userAbena.id,
-      message: 'Your appointment is confirmed!',
-      type: 'APPOINTMENT',
-      status: 'SENT',
-    },
-  });
-
-  // 11. Waitlist
-  await prisma.waitlist.create({
-    data: {
-      clientId: userAbena.client.id,
-      serviceId: 2,
-      preferredDate: new Date('2026-07-15T09:00:00Z'),
+      serviceId: boxBraids.id,
+      staffId: staffUser2.staff.id,
+      date: nextBusinessDateTime(5, 11),
       status: 'PENDING',
     },
   });
+  const booking2 = await prisma.booking.create({
+    data: { appointmentId: appt2.id, clientId: clientUser2.client.id, userId: clientUser2.id, status: 'PENDING' },
+  });
 
-  // 12. Form
-  await prisma.form.create({
+  const appt3 = await prisma.appointment.create({
     data: {
-      clientId: userAbena.client.id,
-      bookingId: booking.id,
-      title: 'Hair Care Preferences',
-      fields: { preferredProducts: 'Shea Butter, Coconut Oil', allergies: 'None' },
+      serviceId: silkPress.id,
+      staffId: staffUser1.staff.id,
+      date: nextBusinessDateTime(-7, 14), // in the past → good for testing "completed" states
+      status: 'COMPLETED',
+    },
+  });
+  const booking3 = await prisma.booking.create({
+    data: { appointmentId: appt3.id, clientId: clientUser3.client.id, userId: clientUser3.id, status: 'COMPLETED' },
+  });
+  await prisma.payment.create({
+    data: {
+      bookingId: booking3.id,
+      amount: silkPress.price,
+      currency: 'GHS',
+      method: 'CASH',
+      provider: 'CASH',
+      status: 'SUCCESS',
     },
   });
 
-  // 13. Settings (upsert)
-  await prisma.settings.upsert({
-    where: { key: 'working_hours' },
-    update: { value: { open: '09:00', close: '18:00' } },
-    create: {
-      key: 'working_hours',
-      value: { open: '09:00', close: '18:00' },
+  console.log('✓ Created 3 appointments with bookings (confirmed, pending, completed)');
+
+  // ── 5. Slots (availability for the booked appointments) ───────────────
+  await prisma.slot.createMany({
+    data: [
+      { appointmentId: appt1.id, startTime: appt1.date, endTime: new Date(appt1.date.getTime() + locRetwist.duration * 60000), isBooked: true },
+      { appointmentId: appt2.id, startTime: appt2.date, endTime: new Date(appt2.date.getTime() + boxBraids.duration * 60000), isBooked: true },
+    ],
+  });
+  console.log('✓ Created slots for booked appointments');
+
+  // ── 6. Promocode ────────────────────────────────────────────────────────
+  await prisma.promocode.create({
+    data: {
+      code: 'WELCOME20',
+      description: '20% off for first-time clients',
+      discount: 20,
+      type: 'PERCENTAGE',
+      validFrom: new Date(),
+      validUntil: nextBusinessDateTime(90, 23),
+      isActive: true,
+    },
+  });
+  console.log('✓ Created promocode WELCOME20');
+
+  // ── 7. Reviews ───────────────────────────────────────────────────────────
+  await prisma.review.create({
+    data: {
+      clientId: clientUser3.client.id,
+      serviceId: silkPress.id,
+      staffId: staffUser1.staff.id,
+      rating: 5,
+      comment: 'Efua did an amazing job, my hair has never looked this smooth!',
+    },
+  });
+  console.log('✓ Created 1 review');
+
+  // ── 8. Waitlist ────────────────────────────────────────────────────────
+  await prisma.waitlist.create({
+    data: {
+      clientId: clientUser2.client.id,
+      serviceId: locStarter.id,
+      preferredDate: nextBusinessDateTime(14, 10),
+      status: 'PENDING',
+    },
+  });
+  console.log('✓ Created 1 waitlist entry');
+
+  // ── 9. Notifications ─────────────────────────────────────────────────
+  await prisma.notification.createMany({
+    data: [
+      {
+        userId: clientUser1.id,
+        message: 'Your Loc Retwist appointment is confirmed for ' + appt1.date.toDateString() + '.',
+        type: 'APPOINTMENT',
+        status: 'SENT',
+        read: false,
+      },
+      {
+        userId: clientUser3.id,
+        message: 'Thanks for visiting Locs Allure! Leave a review and get 10% off your next booking.',
+        type: 'PROMOTION',
+        status: 'SENT',
+        read: true,
+      },
+    ],
+  });
+  console.log('✓ Created 2 notifications');
+
+  // ── 10. Settings ─────────────────────────────────────────────────────
+  await prisma.settings.create({
+    data: {
+      key: 'business_hours',
+      value: {
+        monday: '9:00-18:00',
+        tuesday: '9:00-18:00',
+        wednesday: '9:00-18:00',
+        thursday: '9:00-18:00',
+        friday: '9:00-18:00',
+        saturday: '9:00-18:00',
+        sunday: 'closed',
+      },
       description: 'Salon operating hours',
     },
   });
-
-  // 14. Report
-  await prisma.report.create({
+  await prisma.settings.create({
     data: {
-      title: 'Monthly Bookings Report - June 2026',
-      data: {
-        totalBookings: 25,
-        totalRevenue: 3750,
-        topService: 'Braids',
-        topStaff: 'Ama Mensah',
-      },
+      key: 'cancellation_policy',
+      value: { hoursBeforeAppointment: 24, feePercentage: 20 },
+      description: 'Cancellation window and fee',
     },
   });
+  console.log('✓ Created settings');
 
-  console.log(' All models seeded successfully with correct upsert/createMany usage');
+  console.log('\nDone. Login with any seeded email + password "Password123!":');
+  console.log('  Admin:   admin@locsallure.com');
+  console.log('  Staff:   efua.stylist@locsallure.com / kwame.stylist@locsallure.com');
+  console.log('  Clients: adjoa.client@example.com / kojo.client@example.com / ama.client@example.com');
 }
 
 main()
-  .catch((e) => console.error('❌ Error seeding data:', e))
-  .finally(async () => await prisma.$disconnect());
+  .catch((err) => {
+    console.error('Seed failed:', err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
