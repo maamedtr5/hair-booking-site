@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "main": "src/Server.js",
   "type": "module",
+
   "scripts": {
     "dev": "nodemon src/Server.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "seed": "node prisma/seed.js",
-    "build": "tsc"
+    "seed": "node prisma/seed.js"
   },
+
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+
   "dependencies": {
     "@google-cloud/local-auth": "^3.0.1",
     "@prisma/adapter-pg": "^7.8.0",
@@ -35,17 +40,5 @@
     "twilio": "^6.0.2",
     "uuid": "^14.0.1",
     "yamljs": "^0.3.0"
-  },
-  "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/node": "^25.6.0",
-    "eslint": "^10.7.0",
-    "jest": "^30.4.2",
-    "nodemon": "^3.1.14",
-    "prisma": "^6.19.3",
-    "supertest": "^7.2.2"
-  },
-  "overrides": {
-    "uuid": "^14.0.1"
   }
 }

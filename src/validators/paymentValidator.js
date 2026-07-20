@@ -1,5 +1,5 @@
 // validators/paymentValidator.js
-import { body, param } from 'express-validator';
+import { body} from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
 
 export const validatePaymentCreate = [

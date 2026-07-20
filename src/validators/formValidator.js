@@ -79,8 +79,11 @@ export const validateFormCreate = [
         const fields = typeof value === 'string' ? JSON.parse(value) : value;
         return validateFormFields(fields);
       } catch (error) {
-        throw new Error('Form fields must be valid JSON: ' + error.message);
-      }
+  throw new Error(
+    'Permissions must be valid JSON: ' + error.message,
+    { cause: error }
+  );
+}
     }),
 
   handleValidationErrors,
@@ -102,8 +105,11 @@ export const validateFormUpdate = [
         const fields = typeof value === 'string' ? JSON.parse(value) : value;
         return validateFormFields(fields);
       } catch (error) {
-        throw new Error('Form fields must be valid JSON: ' + error.message);
-      }
+  throw new Error(
+    'Permissions must be valid JSON: ' + error.message,
+    { cause: error }
+  );
+}
     }),
 
   handleValidationErrors,

@@ -51,7 +51,7 @@ async function main() {
   // ── 2. Users + role rows ──────────────────────────────────────────────
   const defaultPassword = await hash('Password123!');
 
-  const adminUser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       name: 'Abena Owusu',
       email: 'admin@locsallure.com',
@@ -119,7 +119,7 @@ async function main() {
   console.log('✓ Created 1 admin, 2 staff, 3 clients (all passwords: Password123!)');
 
   // ── 3. Services ────────────────────────────────────────────────────────
-  const [locRetwist, boxBraids, silkPress, deepCondition, locStarter] = await Promise.all([
+  const [locRetwist, boxBraids, silkPress, , locStarter] = await Promise.all([
     prisma.service.create({
       data: {
         name: 'Loc Retwist',
@@ -196,7 +196,7 @@ async function main() {
       status: 'PENDING',
     },
   });
-  const booking2 = await prisma.booking.create({
+  await prisma.booking.create({
     data: { appointmentId: appt2.id, clientId: clientUser2.client.id, userId: clientUser2.id, status: 'PENDING' },
   });
 

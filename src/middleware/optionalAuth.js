@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 
 export const optionalAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
+
   if (!authHeader) return next();
 
   const token = authHeader.split(' ')[1];
@@ -12,7 +13,8 @@ export const optionalAuth = (req, res, next) => {
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
   } catch {
-    
+    // Ignore invalid or expired tokens for optional authentication
   }
+
   next();
 };

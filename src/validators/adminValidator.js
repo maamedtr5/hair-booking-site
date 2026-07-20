@@ -45,7 +45,7 @@ const validatePermissions = (permissions) => {
 
     // All values should be boolean
     const nonBooleanValues = Object.entries(permissions).filter(
-      ([key, value]) => typeof value !== 'boolean'
+      ([_key, value]) => typeof value !== 'boolean'
     );
     
     if (nonBooleanValues.length > 0) {
@@ -97,8 +97,11 @@ export const validateAdminCreate = [
         const permissions = typeof value === 'string' ? JSON.parse(value) : value;
         return validatePermissions(permissions);
       } catch (error) {
-        throw new Error('Permissions must be valid JSON: ' + error.message);
-      }
+  throw new Error(
+    'Permissions must be valid JSON: ' + error.message,
+    { cause: error }
+  );
+}
     }),
 
   body('department')
@@ -134,8 +137,11 @@ export const validateAdminUpdate = [
         const permissions = typeof value === 'string' ? JSON.parse(value) : value;
         return validatePermissions(permissions);
       } catch (error) {
-        throw new Error('Permissions must be valid JSON: ' + error.message);
-      }
+  throw new Error(
+    'Permissions must be valid JSON: ' + error.message,
+    { cause: error }
+  );
+}
     }),
 
   body('department')
@@ -147,7 +153,7 @@ export const validateAdminUpdate = [
   // Prevent updating userId
   body('userId')
     .optional()
-    .custom((value) => {
+    .custom(() => {
       throw new Error('User ID cannot be updated. Create a new admin record instead.');
     }),
 
@@ -165,8 +171,11 @@ export const validateAdminPermissionUpdate = [
         const permissions = typeof value === 'string' ? JSON.parse(value) : value;
         return validatePermissions(permissions);
       } catch (error) {
-        throw new Error('Permissions must be valid JSON: ' + error.message);
-      }
+  throw new Error(
+    'Permissions must be valid JSON: ' + error.message,
+    { cause: error }
+  );
+}
     }),
 
   handleValidationErrors,

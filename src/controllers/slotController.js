@@ -8,11 +8,11 @@ function sanitizeSlot(slot) {
   const safeSlot = { ...slot };
 
   if (safeSlot.appointment?.client?.password) {
-    const { password, ...safeClient } = safeSlot.appointment.client;
+    const { _password, ...safeClient } = safeSlot.appointment.client;
     safeSlot.appointment.client = safeClient;
   }
   if (safeSlot.appointment?.user?.password) {
-    const { password, ...safeUser } = safeSlot.appointment.user;
+    const { _password, ...safeUser } = safeSlot.appointment.user;
     safeSlot.appointment.user = safeUser;
   }
 

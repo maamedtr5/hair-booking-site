@@ -5,7 +5,6 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import path from 'path';
-import { env } from './config/env.js';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 
@@ -42,7 +41,7 @@ const PORT = process.env.PORT || 5001;
 let swaggerDocument;
 try {
   swaggerDocument = YAML.load(path.join(process.cwd(), 'docs', 'swagger.yaml'));
-} catch (error) {
+} catch (_error) {
   console.warn('Swagger documentation not found. Skipping API docs.');
 }
 
@@ -90,11 +89,11 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
     return res.status(400).json({ success: false, message: 'Invalid JSON format' });
   }
-  next(err);
+  _next(err);
 });
 
 if (swaggerDocument) {
@@ -147,7 +146,7 @@ app.get('/jobs/stats', async (req, res) => {
   try {
     const stats = await getQueueStats();
     res.json({ success: true, data: stats });
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, message: 'Failed to retrieve job stats' });
   }
 });
@@ -156,7 +155,7 @@ app.use((req, res) => {
   res.status(404).json({ success: false, message: 'Endpoint not found', path: req.path });
 });
 
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Global error handler:', err);
   res.status(err.status || 500).json({
     success: false,
@@ -175,8 +174,8 @@ const initializeJobs = async () => {
     if (!calendarConfigured) console.warn('Google Calendar not configured.');
     await scheduleDailyReminders();
     console.log('Background jobs initialized successfully');
-  } catch (error) {
-    console.error('Error initializing background jobs:', error);
+  } catch (_error) {
+    console.error('Error initializing background jobs:', _error);
   }
 };
 

@@ -2,6 +2,8 @@
 import { body, param } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
 
+import { prisma } from '../lib/prisma.js';
+
 /**
  * Validate settings value based on key
  */
@@ -62,13 +64,20 @@ export const validateSettingsCreate = [
   body('value')
     .notEmpty().withMessage('Settings value is required')
     .custom((value, { req }) => {
-      try {
-        const parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
-        return validateSettingsValue(req.body.key, parsedValue);
-      } catch (error) {
-        throw new Error('Settings value must be valid JSON: ' + error.message);
+  try {
+    const parsedValue =
+      typeof value === "string" ? JSON.parse(value) : value;
+
+    return validateSettingsValue(req.body.key, parsedValue);
+  } catch (error) {
+    throw new Error(
+      "Settings value must be valid JSON: " + error.message,
+      {
+        cause: error,
       }
-    }),
+    );
+  }
+}),
 
   body('description')
     .optional()
@@ -84,19 +93,23 @@ export const validateSettingsUpdate = [
 
   body('value')
     .optional()
-    .custom((value, { req }) => {
-      try {
-        // Get the key from the database
-        const settings = prisma.settings.findUnique({
-          where: { id: parseInt(req.params.id) },
-        });
-        
-        const parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
-        return validateSettingsValue(settings?.key || '', parsedValue);
-      } catch (error) {
-        throw new Error('Settings value must be valid JSON: ' + error.message);
-      }
-    }),
+    .custom(async (value, { req }) => {
+  try {
+    const settings = await prisma.settings.findUnique({
+      where: { id: parseInt(req.params.id, 10) },
+    });
+
+    const parsedValue =
+      typeof value === "string" ? JSON.parse(value) : value;
+
+    return validateSettingsValue(settings?.key || "", parsedValue);
+  } catch (error) {
+    throw new Error(
+      "Settings value must be valid JSON: " + error.message,
+      { cause: error }
+    );
+  }
+}),
 
   body('description')
     .optional()
