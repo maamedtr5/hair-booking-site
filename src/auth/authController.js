@@ -1,54 +1,31 @@
-// src/controllers/authController.js
-
+// src/auth/authController.js
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../lib/prisma.js';
+import { prisma } from '../lib/prisma.js'; // shared singleton
 
-// Validate email format
-const isValidEmail = (email) =>
-  typeof email === 'string' &&
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-// Validate password strength
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isStrongPassword = (password) =>
-  typeof password === 'string' &&
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/.test(password);
 
-// Remove password before sending response
-const sanitizeUser = (user) => {
-  if (!user) return null;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
 
-  const { password: _password, ...safeUser } = user;
-  return safeUser;
-};
-
-// Generate JWT token
-const generateToken = (user) => {
+function generateToken(user) {
   return jwt.sign(
-    {
-      id: user.id,
-      role: user.role,
-    },
+    { id: user.id, role: user.role },
     process.env.JWT_SECRET,
-    {
-      expiresIn: '1d',
-    }
+    { expiresIn: '1d' }
   );
-};
+}
 
+function sanitizeUser(user) {
+  const { password, ...safeUser } = user;
+  return safeUser;
+}
 
-// ======================
-// REGISTER
-// ======================
+// REGISTER — public self-signup. Role is ALWAYS forced to CLIENT here.
 export const register = async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      role,
-    } = req.body;
-
+    const { name, email, password } = req.body; // role intentionally not read
 
     if (!name || name.trim().length < 2) {
       return res.status(400).json({
@@ -56,13 +33,9 @@ export const register = async (req, res) => {
       });
     }
 
-
     if (!isValidEmail(email)) {
-      return res.status(400).json({
-        error: 'Invalid email format.',
-      });
+      return res.status(400).json({ error: 'Invalid email format.' });
     }
-
 
     if (!isStrongPassword(password)) {
       return res.status(400).json({
@@ -71,125 +44,75 @@ export const register = async (req, res) => {
       });
     }
 
-
     const existingUser = await prisma.user.findUnique({
-      where: {
-        email,
-      },
+      where: { email: email.toLowerCase() },
     });
-
-
     if (existingUser) {
-      return res.status(409).json({
-        error: 'Email already exists. Please use another email.',
-      });
+      return res.status(409).json({ error: 'Email already exists. Please use another email.' });
     }
 
-
     const hashedPassword = await bcrypt.hash(password, 10);
-
-
     const user = await prisma.user.create({
       data: {
         name: name.trim(),
         email: email.toLowerCase(),
         password: hashedPassword,
-        role,
+        role: 'CLIENT', // hardcoded
       },
     });
 
-
     const token = generateToken(user);
-
-
-    res.status(201).json({
-      user: sanitizeUser(user),
-      token,
-    });
-
-
+    res.status(201).json({ user: sanitizeUser(user), token });
   } catch (error) {
-
     console.error('Register error:', error);
-
-
     if (error.code === 'P2002') {
-      return res.status(409).json({
-        error: 'Email already exists.',
-      });
+      return res.status(409).json({ error: 'Email already exists.' });
     }
-
-
-    res.status(500).json({
-      error: 'Registration failed.',
-    });
+    res.status(500).json({ error: 'Registration failed.' });
   }
 };
 
-
-
-// ======================
 // LOGIN
-// ======================
 export const login = async (req, res) => {
   try {
+    const { email, password } = req.body;
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
 
-    const {
-      email,
-      password,
-    } = req.body;
-
-
-    if (!email || !password) {
-      return res.status(400).json({
-        error: 'Email and password are required.',
-      });
-    }
-
-
-    const user = await prisma.user.findUnique({
-      where: {
-        email: email.toLowerCase(),
-      },
-    });
-
-
-    if (!user) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-      });
-    }
-
-
-    const passwordMatch = await bcrypt.compare(
-      password,
-      user.password
-    );
-
-
-    if (!passwordMatch) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-      });
-    }
-
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
 
     const token = generateToken(user);
+    return res.json({ user: sanitizeUser(user), token });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
 
+// LOGOUT — revoke current session
+export const logout = async (req, res) => {
+  try {
+    if (req.sessionId) {
+      await prisma.session.update({
+        where: { id: req.sessionId },
+        data: { revokedAt: new Date() },
+      });
+    }
+    return res.json({ message: 'Logged out' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+};
 
-    res.status(200).json({
-      token,
-      user: sanitizeUser(user),
+// LOGOUT-ALL — revoke all sessions for this user
+export const logoutAll = async (req, res) => {
+  try {
+    await prisma.session.updateMany({
+      where: { userId: req.user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
-
-
-  } catch (error) {
-
-    console.error('Login error:', error);
-
-
-    res.status(500).json({
-      error: 'Login failed.',
-    });
+    return res.json({ message: 'Logged out of all devices' });
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 };

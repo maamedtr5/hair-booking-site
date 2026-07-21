@@ -1,4 +1,3 @@
-// validators/authValidator.js
 import { body } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
 
@@ -21,9 +20,10 @@ export const validateRegister = [
     .matches(/[0-9]/).withMessage('Password must contain at least one number')
     .matches(/[^A-Za-z0-9]/).withMessage('Password must contain at least one special character'),
 
-  body('role')
-    .optional()
-    .isIn(['USER', 'ADMIN']).withMessage('Invalid role'),
+  // No `role` field here, intentionally. Public self-registration must never
+  // accept a client-supplied role — see authController.register, which
+  // hardcodes CLIENT regardless of what's in the body. Staff/admin accounts
+  // are created only via POST /users (admin-gated, userController.js).
 
   handleValidationErrors,
 ];

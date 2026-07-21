@@ -1,4 +1,5 @@
 // src/utils/response.js
+
 export function sendSuccess(res, data = null, status = 200, message) {
   const body = { success: true, data };
   if (message) body.message = message;

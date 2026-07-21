@@ -14,6 +14,7 @@ model User {
   email    String @unique
   password String
   role     Role   @default(CLIENT)
+  sessions Session[] 
 
   // Google Calendar integration
   googleAccessToken   String?   @db.Text
@@ -327,5 +328,18 @@ model Report {
   title     String
   data      Json
   createdAt DateTime @default(now())
+}
+model Session {
+  id        String    @id @default(cuid())
+  userId    Int
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 

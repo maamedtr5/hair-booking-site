@@ -26,9 +26,12 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import authRoutes from './auth/authRoutes.js';
 import slotRoutes from './routes/slotRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
+import consentRoutes from './routes/consentRoutes.js';
+import intakeRoutes from './routes/intakeRoutes.js';
 import googleAuthRoutes from './routes/googleAuthRoutes.js';
 
 import { scheduleDailyReminders, getQueueStats } from './jobs/reminderJobs.js';
+import { scheduleSessionCleanup } from './jobs/sessionCleanup.js';
 import { verifyEmailConfig } from './services/emailService.js';
 import { verifySMSConfig } from './services/smsService.js';
 import { verifyCalendarConfig } from './services/googleCalendarService.js';
@@ -114,6 +117,9 @@ app.get('/', (req, res) => {
       forms: '/forms', settings: '/settings', waitlist: '/waitlist',
       notifications: '/notifications', reports: '/reports', slots: '/slots',
       webhooks: '/webhooks',
+      consent: '/consent',
+      intake: '/intake', 
+      
     },
   });
 });
@@ -141,6 +147,8 @@ app.use('/notifications', notificationRoutes);
 app.use('/reports', reportRoutes);
 app.use('/slots', slotRoutes);
 app.use('/webhooks', webhookRoutes);
+app.use('/consent', consentRoutes);
+app.use('/intake', intakeRoutes);
 
 app.get('/jobs/stats', async (req, res) => {
   try {
