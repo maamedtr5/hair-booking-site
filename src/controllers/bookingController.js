@@ -7,11 +7,11 @@ function sanitizeBooking(booking) {
   if (!booking) return null;
   const safe = { ...booking };
   if (safe.client?.user?.password) {
-    const { _password, ...safeUser } = safe.client.user;
+    const { password, ...safeUser } = safe.client.user;
     safe.client = { ...safe.client, user: safeUser };
   }
   if (safe.user?.password) {
-    const { _password, ...safeUser } = safe.user;
+    const { password, ...safeUser } = safe.user;
     safe.user = safeUser;
   }
   return safe;

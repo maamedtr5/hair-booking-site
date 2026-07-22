@@ -1,10 +1,8 @@
-// validators/waitlistValidator.js
+ // validators/waitlistValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isFutureDate } from './validationHelpers.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 export const validateWaitlistCreate = [
   body('clientId')

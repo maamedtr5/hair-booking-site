@@ -1,9 +1,7 @@
-// services/googleCalendarService.js
+ // services/googleCalendarService.js
 import { google } from 'googleapis';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 // OAuth2 client configuration
 export const oauth2Client = new google.auth.OAuth2(

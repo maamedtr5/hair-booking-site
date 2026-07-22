@@ -3,10 +3,8 @@ import cron from 'node-cron';
 import moment from 'moment';
 import { sendEmail } from '../services/emailService.js';
 import { sendAppointmentReminderSMS } from '../services/smsService.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 // Keep a registry of scheduled tasks in memory
 const reminderTasks = {};

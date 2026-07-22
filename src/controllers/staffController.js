@@ -6,14 +6,15 @@ import {
   updateStaff,
   deleteStaff
 } from '../models/staff.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 //   Create new staff
 export const createStaffHandler = async (req, res) => {
   try {
     const staff = await createStaff(req.body);
-    res.status(201).json(staff); 
+    return sendSuccess(res, staff, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -24,12 +25,12 @@ export const getStaffHandler = async (req, res) => {
     const staff = await getStaffById(staffId);
 
     if (!staff) {
-      return res.status(404).json({ error: "Staff not found" });
+      return sendError(res, 'Staff not found', 404);
     }
 
-    res.status(200).json(staff);
+    return sendSuccess(res, staff);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -46,9 +47,9 @@ export const getStaffsHandler = async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
-    res.status(200).json(staff);
+    return sendSuccess(res, staff);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -57,9 +58,9 @@ export const updateStaffHandler = async (req, res) => {
   try {
     const staffId = parseInt(req.params.id);
     const updated = await updateStaff(staffId, req.body);
-    res.status(200).json(updated);
+    return sendSuccess(res, updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -68,8 +69,8 @@ export const deleteStaffHandler = async (req, res) => {
   try {
     const staffId = parseInt(req.params.id);
     await deleteStaff(staffId);
-    res.status(200).json({ message: "Staff deleted successfully" });
+    return sendSuccess(res, null, 200, 'Staff deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

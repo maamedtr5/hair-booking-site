@@ -1,6 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-
-
+import { sendSuccess, sendError } from '../utils/response.js';
 
 export async function createIntakeForm(req, res) {
   try {
@@ -22,8 +21,8 @@ export async function createIntakeForm(req, res) {
       },
     });
 
-    res.status(201).json(intake);
+    return sendSuccess(res, intake, 201);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to save intake form', details: err.message });
+    return sendError(res, 'Failed to save intake form', 500, { details: err.message });
   }
 }

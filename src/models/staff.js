@@ -1,7 +1,5 @@
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 
 export async function createStaff(data) { return prisma.staff.create({ data }); }

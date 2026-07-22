@@ -1,7 +1,5 @@
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+ import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 // Fetch notifications with pagination, filtering, and sorting
 export async function getUserNotifications(userId, { skip = 0, take = 10, type, status, date }) {

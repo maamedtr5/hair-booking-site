@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-
+import { sendSuccess, sendError } from '../utils/response.js';
 
 export async function createConsentForm(req, res) {
   try {
@@ -13,8 +13,8 @@ export async function createConsentForm(req, res) {
       },
     });
 
-    res.status(201).json(consent);
+    return sendSuccess(res, consent, 201);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to save consent form', details: err.message });
+    return sendError(res, 'Failed to save consent form', 500, { details: err.message });
   }
 }

@@ -1,34 +1,34 @@
 // controllers/promocodeController.js
 import { prisma } from '../lib/prisma.js';
 import promocodeModel from '../models/promocode.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 export const createPromocode = async (req, res) => {
   try {
     const promocode = await promocodeModel.createPromocode(req.body);
-    res.status(201).json(promocode);  
+    return sendSuccess(res, promocode, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
-
 
 export const getPromocode = async (req, res) => {
   try {
     const promocode = await promocodeModel.getPromocodeById(parseInt(req.params.id));
-    if (!promocode) return res.status(404).json({ error: "Promocode not found" });
-    res.json(promocode);
+    if (!promocode) return sendError(res, 'Promocode not found', 404);
+    return sendSuccess(res, promocode);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const getPromocodeByCode = async (req, res) => {
   try {
     const promocode = await promocodeModel.getPromocodeByCode(req.params.code);
-    if (!promocode) return res.status(404).json({ error: "Promocode not found" });
-    res.json(promocode);
+    if (!promocode) return sendError(res, 'Promocode not found', 404);
+    return sendSuccess(res, promocode);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -45,26 +45,26 @@ export const getPromocodes = async (req, res) => {
       orderBy: { createdAt: 'desc' }, // optional: newest first
     });
 
-    res.json(promocodes);
+    return sendSuccess(res, promocodes);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const updatePromocode = async (req, res) => {
   try {
     const promocode = await promocodeModel.updatePromocode(parseInt(req.params.id), req.body);
-    res.json(promocode);
+    return sendSuccess(res, promocode);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const deletePromocode = async (req, res) => {
   try {
     await promocodeModel.deletePromocode(parseInt(req.params.id));
-    res.json({ message: "Promocode deleted successfully" });
+    return sendSuccess(res, null, 200, 'Promocode deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

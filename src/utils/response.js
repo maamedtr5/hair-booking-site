@@ -1,7 +1,8 @@
 // src/utils/response.js
+import { stripPasswords } from './sanitize.js';
 
 export function sendSuccess(res, data = null, status = 200, message) {
-  const body = { success: true, data };
+  const body = { success: true, data: stripPasswords(data) };
   if (message) body.message = message;
   return res.status(status).json(body);
 }

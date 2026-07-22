@@ -1,6 +1,6 @@
 // src/controllers/slotController.js
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 // Utility: sanitize nested appointment/client data
 function sanitizeSlot(slot) {
@@ -8,11 +8,11 @@ function sanitizeSlot(slot) {
   const safeSlot = { ...slot };
 
   if (safeSlot.appointment?.client?.password) {
-    const { _password, ...safeClient } = safeSlot.appointment.client;
+    const { password, ...safeClient } = safeSlot.appointment.client;
     safeSlot.appointment.client = safeClient;
   }
   if (safeSlot.appointment?.user?.password) {
-    const { _password, ...safeUser } = safeSlot.appointment.user;
+    const { password, ...safeUser } = safeSlot.appointment.user;
     safeSlot.appointment.user = safeUser;
   }
 
@@ -23,12 +23,11 @@ function sanitizeSlot(slot) {
 export const createSlot = async (req, res) => {
   try {
     const slot = await prisma.slot.create({ data: req.body });
-    res.status(201).json(sanitizeSlot(slot));   // 👈 corrected line
+    return sendSuccess(res, sanitizeSlot(slot), 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
-
 
 //   Get all Slots (with skip/take pagination)
 export const getSlots = async (req, res) => {
@@ -48,10 +47,10 @@ export const getSlots = async (req, res) => {
       orderBy: { startTime: 'asc' } // optional: order by start time
     });
 
-    res.json(slots.map(sanitizeSlot));
+    return sendSuccess(res, slots.map(sanitizeSlot));
   } catch (err) {
     console.error('Error fetching slots:', err);
-    res.status(500).json({ error: 'Failed to fetch slots. Please try again later.' });
+    return sendError(res, 'Failed to fetch slots. Please try again later.', 500);
   }
 };
 
@@ -63,11 +62,11 @@ export const getSlotById = async (req, res) => {
       include: { appointment: { include: { client: true, user: true } } }
     });
     if (!slot) {
-      return res.status(404).json({ error: 'Slot not found' });
+      return sendError(res, 'Slot not found', 404);
     }
-    res.json(sanitizeSlot(slot));
+    return sendSuccess(res, sanitizeSlot(slot));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -79,9 +78,9 @@ export const updateSlot = async (req, res) => {
       data: req.body,
       include: { appointment: { include: { client: true, user: true } } }
     });
-    res.json(sanitizeSlot(slot));
+    return sendSuccess(res, sanitizeSlot(slot));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -89,8 +88,8 @@ export const updateSlot = async (req, res) => {
 export const deleteSlot = async (req, res) => {
   try {
     await prisma.slot.delete({ where: { id: parseInt(req.params.id) } });
-    res.json({ message: 'Slot deleted' });
+    return sendSuccess(res, null, 200, 'Slot deleted');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

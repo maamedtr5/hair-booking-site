@@ -5,7 +5,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 
 const stripPassword = (user) => {
   if (!user) return user;
-  const { _password, ...safe } = user;
+  const { password, ...safe } = user;
   return safe;
 };
 

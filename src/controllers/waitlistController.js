@@ -5,6 +5,7 @@ import {
   updateWaitlist,
   deleteWaitlistEntry
 } from '../models/waitlist.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 // Utility: sanitize nested client data
 function sanitizeWaitlist(waitlist) {
@@ -13,7 +14,7 @@ function sanitizeWaitlist(waitlist) {
   const safeWaitlist = { ...waitlist };
 
   if (safeWaitlist.client?.password) {
-    const { password: _password, ...safeClient } = safeWaitlist.client;
+    const { password, ...safeClient } = safeWaitlist.client;
     safeWaitlist.client = safeClient;
   }
 
@@ -23,10 +24,9 @@ function sanitizeWaitlist(waitlist) {
 export async function addToWaitlistHandler(req, res) {
   try {
     const waitlist = await addToWaitlist(req.body);
-
-    res.status(201).json(sanitizeWaitlist(waitlist));
+    return sendSuccess(res, sanitizeWaitlist(waitlist), 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
@@ -37,12 +37,12 @@ export async function getWaitlistEntryHandler(req, res) {
     const waitlist = await getWaitlistById(id);
 
     if (!waitlist) {
-      return res.status(404).json({ error: 'Entry not found' });
+      return sendError(res, 'Entry not found', 404);
     }
 
-    res.json(sanitizeWaitlist(waitlist));
+    return sendSuccess(res, sanitizeWaitlist(waitlist));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
@@ -57,9 +57,9 @@ export async function getWaitlistEntriesHandler(req, res) {
       take,
     });
 
-    res.json(waitlists.map(sanitizeWaitlist));
+    return sendSuccess(res, waitlists.map(sanitizeWaitlist));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
@@ -69,9 +69,9 @@ export async function updateWaitlistEntryHandler(req, res) {
 
     const waitlist = await updateWaitlist(id, req.body);
 
-    res.json(sanitizeWaitlist(waitlist));
+    return sendSuccess(res, sanitizeWaitlist(waitlist));
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }
 
@@ -81,8 +81,8 @@ export async function deleteWaitlistEntryHandler(req, res) {
 
     await deleteWaitlistEntry(id);
 
-    res.json({ message: 'Entry deleted successfully' });
+    return sendSuccess(res, null, 200, 'Entry deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 }

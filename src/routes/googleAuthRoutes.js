@@ -5,11 +5,9 @@ import {
   getTokensFromCode,
 } from '../services/googleCalendarService.js';
 import { authenticate } from '../auth/authMiddleware.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * GET /auth/google/calendar

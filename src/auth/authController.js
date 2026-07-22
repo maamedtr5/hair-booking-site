@@ -2,6 +2,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js'; // shared singleton
+import { sendSuccess, sendError } from '../utils/response.js';
 
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 const isStrongPassword = (password) =>
@@ -9,12 +10,26 @@ const isStrongPassword = (password) =>
 
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
 
-function generateToken(user) {
-  return jwt.sign(
+// Creates the session row that authMiddleware/logout rely on for revocation,
+// and signs a JWT whose `jti` claim points at that session's id. Without this,
+// tokens are stateless and "logout" can never actually invalidate a token.
+async function issueSession(req, user) {
+  const session = await prisma.session.create({
+    data: {
+      userId: user.id,
+      userAgent: req.headers['user-agent']?.slice(0, 255) || null,
+      ipAddress: req.ip || null,
+      expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+    },
+  });
+
+  const token = jwt.sign(
     { id: user.id, role: user.role },
     process.env.JWT_SECRET,
-    { expiresIn: '1d' }
+    { expiresIn: '1d', jwtid: session.id }
   );
+
+  return token;
 }
 
 function sanitizeUser(user) {
@@ -28,27 +43,26 @@ export const register = async (req, res) => {
     const { name, email, password } = req.body; // role intentionally not read
 
     if (!name || name.trim().length < 2) {
-      return res.status(400).json({
-        error: 'Name is required and must be at least 2 characters long.',
-      });
+      return sendError(res, 'Name is required and must be at least 2 characters long.', 400);
     }
 
     if (!isValidEmail(email)) {
-      return res.status(400).json({ error: 'Invalid email format.' });
+      return sendError(res, 'Invalid email format.', 400);
     }
 
     if (!isStrongPassword(password)) {
-      return res.status(400).json({
-        error:
-          'Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.',
-      });
+      return sendError(
+        res,
+        'Password must be at least 8 characters long and include uppercase, lowercase, number, and special character.',
+        400
+      );
     }
 
     const existingUser = await prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
     if (existingUser) {
-      return res.status(409).json({ error: 'Email already exists. Please use another email.' });
+      return sendError(res, 'Email already exists. Please use another email.', 409);
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -61,14 +75,14 @@ export const register = async (req, res) => {
       },
     });
 
-    const token = generateToken(user);
-    res.status(201).json({ user: sanitizeUser(user), token });
+    const token = await issueSession(req, user);
+    return sendSuccess(res, { user: sanitizeUser(user), token }, 201);
   } catch (error) {
     console.error('Register error:', error);
     if (error.code === 'P2002') {
-      return res.status(409).json({ error: 'Email already exists.' });
+      return sendError(res, 'Email already exists.', 409);
     }
-    res.status(500).json({ error: 'Registration failed.' });
+    return sendError(res, 'Registration failed.', 500);
   }
 };
 
@@ -76,16 +90,22 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+
+    if (!email || !password) {
+      return sendError(res, 'Email and password are required.', 400);
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    if (!user) return sendError(res, 'Invalid credentials', 401);
 
     const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!validPassword) return sendError(res, 'Invalid credentials', 401);
 
-    const token = generateToken(user);
-    return res.json({ user: sanitizeUser(user), token });
+    const token = await issueSession(req, user);
+    return sendSuccess(res, { user: sanitizeUser(user), token });
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    console.error('Login error:', err);
+    return sendError(res, 'Login failed.', 500);
   }
 };
 
@@ -93,14 +113,15 @@ export const login = async (req, res) => {
 export const logout = async (req, res) => {
   try {
     if (req.sessionId) {
-      await prisma.session.update({
-        where: { id: req.sessionId },
+      await prisma.session.updateMany({
+        where: { id: req.sessionId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
     }
-    return res.json({ message: 'Logged out' });
+    return sendSuccess(res, null, 200, 'Logged out');
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    console.error('Logout error:', err);
+    return sendError(res, 'Logout failed.', 400);
   }
 };
 
@@ -111,8 +132,9 @@ export const logoutAll = async (req, res) => {
       where: { userId: req.user.id, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-    return res.json({ message: 'Logged out of all devices' });
+    return sendSuccess(res, null, 200, 'Logged out of all devices');
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    console.error('Logout-all error:', err);
+    return sendError(res, 'Logout failed.', 400);
   }
 };

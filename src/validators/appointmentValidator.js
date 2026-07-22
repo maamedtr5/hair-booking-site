@@ -1,10 +1,7 @@
 // validators/appointmentValidator.js (add this to existing)
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isFutureDate, isBusinessHours } from './validationHelpers.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 export const validateAppointmentCreate = [
   body('serviceId')

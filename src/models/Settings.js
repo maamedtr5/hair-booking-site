@@ -1,8 +1,6 @@
-// models/settings.js
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+ // models/settings.js
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 
 async function createSetting(data) {

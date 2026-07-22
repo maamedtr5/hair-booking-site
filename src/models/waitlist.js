@@ -1,8 +1,6 @@
 // src/models/waitlist.js
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 export async function addToWaitlist(data) {
   return prisma.waitlist.create({

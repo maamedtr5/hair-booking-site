@@ -1,10 +1,8 @@
-// validators/bookingValidator.js
+ // validators/bookingValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 export const validateBookingCreate = [
   body('appointmentId')

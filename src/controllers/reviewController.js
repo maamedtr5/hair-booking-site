@@ -1,23 +1,24 @@
 // controllers/reviewController.js
 import { prisma } from '../lib/prisma.js';
 import reviewModel from '../models/review.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 export const createReview = async (req, res) => {
   try {
     const review = await reviewModel.createReview(req.body);
-    res.json(review);
+    return sendSuccess(res, review, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const getReview = async (req, res) => {
   try {
     const review = await reviewModel.getReviewById(parseInt(req.params.id));
-    if (!review) return res.status(404).json({ error: "Review not found" });
-    res.json(review);
+    if (!review) return sendError(res, 'Review not found', 404);
+    return sendSuccess(res, review);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -32,34 +33,33 @@ export const getReviews = async (req, res) => {
       skip,
       take,
       include: {
-        client: true,     
-        staff: true,      
-        service: true,    
+        client: true,
+        staff: true,
+        service: true,
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    res.json(reviews);
+    return sendSuccess(res, reviews);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
-
 
 export const updateReview = async (req, res) => {
   try {
     const review = await reviewModel.updateReview(parseInt(req.params.id), req.body);
-    res.json(review);
+    return sendSuccess(res, review);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const deleteReview = async (req, res) => {
   try {
     await reviewModel.deleteReview(parseInt(req.params.id));
-    res.json({ message: "Review deleted successfully" });
+    return sendSuccess(res, null, 200, 'Review deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

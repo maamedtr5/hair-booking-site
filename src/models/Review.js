@@ -1,8 +1,6 @@
-// models/review.js
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+ // models/review.js
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 
 async function createReview(data) {

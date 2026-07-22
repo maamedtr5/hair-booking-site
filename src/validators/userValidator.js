@@ -1,10 +1,8 @@
-// validators/userValidator.js
+ // validators/userValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isStrongPassword } from './validationHelpers.js';
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 export const validateUserRegistration = [
   body('name')
@@ -207,4 +205,4 @@ export const validateGoogleDisconnect = [
     }),
 
   handleValidationErrors,
-];                                                                                                                                                                                                                                                                                                                                                                            
+];

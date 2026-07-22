@@ -1,8 +1,6 @@
 // models/service.js
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
  
 async function createService(data) {
   return prisma.service.create({ data });

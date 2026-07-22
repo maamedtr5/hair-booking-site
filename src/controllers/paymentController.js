@@ -1,16 +1,52 @@
 import { handlePayment } from '../services/payment/providerService.js';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
-const prisma = new PrismaClient();
+// Computes the authoritative charge amount server-side from the booking's
+// service price (+ active promocode discount), rather than trusting whatever
+// `amount` the client sends. A client-supplied amount must never be charged
+// as-is — that would let anyone pay any price they choose.
+async function resolveBookingAmount(bookingId) {
+  const booking = await prisma.booking.findUnique({
+    where: { id: bookingId },
+    include: {
+      appointment: { include: { service: true } },
+      promocode: true,
+    },
+  });
+
+  if (!booking) {
+    throw new Error('Booking not found');
+  }
+
+  let amount = booking.appointment.service.price;
+
+  if (booking.promocode && booking.promocode.isActive) {
+    const now = new Date();
+    if (now >= booking.promocode.validFrom && now <= booking.promocode.validUntil) {
+      amount =
+        booking.promocode.type === 'PERCENTAGE'
+          ? amount - (amount * booking.promocode.discount) / 100
+          : Math.max(0, amount - booking.promocode.discount);
+    }
+  }
+
+  return { booking, amount };
+}
 
 //   Initialize payment (creates a new record)
 export const initializePayment = async (req, res) => {
-  const { bookingId, amount, method, provider, metadata } = req.body;
+  const { bookingId, method, provider, metadata } = req.body;
 
   try {
     if (!provider) {
-      return res.status(400).json({ error: "Payment provider must be explicitly set" });
+      return sendError(res, 'Payment provider must be explicitly set', 400);
     }
+    if (!bookingId) {
+      return sendError(res, 'bookingId is required', 400);
+    }
+
+    const { amount } = await resolveBookingAmount(bookingId);
 
     const response = await handlePayment(provider, amount, metadata);
 
@@ -23,14 +59,14 @@ export const initializePayment = async (req, res) => {
         status: 'PENDING',
         transactionRef: response.reference,
         externalId: response.externalId,
-        metadata
-      }
+        metadata,
+      },
     });
 
     //    201 Created for new resource
-    res.status(201).json({ payment, checkoutUrl: response.checkoutUrl });
+    return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl }, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -43,9 +79,9 @@ export const markPaymentSuccess = async (req, res) => {
     });
 
     //    200 OK (resource updated)
-    res.status(200).json(payment);
+    return sendSuccess(res, payment);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -58,9 +94,9 @@ export const markPaymentFailed = async (req, res) => {
     });
 
     //    200 OK (resource updated)
-    res.status(200).json(payment);
+    return sendSuccess(res, payment);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -84,8 +120,8 @@ export const getPayments = async (req, res) => {
     });
 
     //    200 OK for successful retrieval
-    res.status(200).json(payments);
+    return sendSuccess(res, payments);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

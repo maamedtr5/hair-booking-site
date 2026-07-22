@@ -1,8 +1,6 @@
 // models/appointment.js
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 
 async function createAppointment(data) {

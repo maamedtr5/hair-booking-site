@@ -2,24 +2,24 @@
 
 import { prisma } from '../lib/prisma.js';
 import formModel from '../models/form.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 export const createForm = async (req, res) => {
   try {
     const form = await formModel.createForm(req.body);
-    res.status(201).json(form);  
+    return sendSuccess(res, form, 201);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
-
 
 export const getForm = async (req, res) => {
   try {
     const form = await formModel.getFormById(parseInt(req.params.id));
-    if (!form) return res.status(404).json({ error: "Form not found" });
-    res.json(form);
+    if (!form) return sendError(res, 'Form not found', 404);
+    return sendSuccess(res, form);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -34,32 +34,31 @@ export const getForms = async (req, res) => {
       skip,
       take,
       include: {
-        client: true,   
-        booking: true,  
+        client: true,
+        booking: true,
       },
     });
 
-    res.json(forms);
+    return sendSuccess(res, forms);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
-
 
 export const updateForm = async (req, res) => {
   try {
     const form = await formModel.updateForm(parseInt(req.params.id), req.body);
-    res.json(form);
+    return sendSuccess(res, form);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
 export const deleteForm = async (req, res) => {
   try {
     await formModel.deleteForm(parseInt(req.params.id));
-    res.json({ message: "Form deleted successfully" });
+    return sendSuccess(res, null, 200, 'Form deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

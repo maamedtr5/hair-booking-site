@@ -1,13 +1,14 @@
 // src/controllers/adminController.js
 import { prisma } from '../lib/prisma.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 
 //   Create admin
 export const createAdminHandler = async (req, res) => {
   try {
     const admin = await prisma.admin.create({ data: req.body });
-    res.status(201).json(admin); //   201 Created for new resource
+    return sendSuccess(res, admin, 201); //   201 Created for new resource
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -18,10 +19,10 @@ export const getAdminHandler = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       include: { user: true }
     });
-    if (!admin) return res.status(404).json({ error: "Admin not found" });
-    res.status(200).json(admin);
+    if (!admin) return sendError(res, 'Admin not found', 404);
+    return sendSuccess(res, admin);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -38,9 +39,9 @@ export const getAdminsHandler = async (req, res) => {
       orderBy: { createdAt: 'desc' }, //   consistent ordering
     });
 
-    res.status(200).json(admins);
+    return sendSuccess(res, admins);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -51,9 +52,9 @@ export const updateAdminHandler = async (req, res) => {
       where: { id: parseInt(req.params.id) },
       data: req.body
     });
-    res.status(200).json(admin);
+    return sendSuccess(res, admin);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };
 
@@ -61,8 +62,8 @@ export const updateAdminHandler = async (req, res) => {
 export const deleteAdminHandler = async (req, res) => {
   try {
     await prisma.admin.delete({ where: { id: parseInt(req.params.id) } });
-    res.status(200).json({ message: "Admin deleted successfully" });
+    return sendSuccess(res, null, 200, 'Admin deleted successfully');
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    return sendError(res, err.message, 400);
   }
 };

@@ -1,8 +1,6 @@
-// src/models/user.js
-import pkg from '@prisma/client';
-const { PrismaClient } = pkg;
+ // src/models/user.js
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 
 export async function createUser(data) {
   return prisma.user.create({ data });
