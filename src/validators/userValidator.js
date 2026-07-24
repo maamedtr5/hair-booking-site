@@ -1,4 +1,4 @@
- // validators/userValidator.js
+// validators/userValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isStrongPassword } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
@@ -205,4 +205,4 @@ export const validateGoogleDisconnect = [
     }),
 
   handleValidationErrors,
-];
+];                                                                                                                                                                                                                                                                                                                                                                            

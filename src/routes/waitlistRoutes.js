@@ -20,7 +20,7 @@ const router = express.Router();
 router.post(
   '/',
   authenticate,
-  requireRole('client'),          
+  requireRole('CLIENT'),
   validateWaitlistCreate,
   addToWaitlistHandler
 );
@@ -29,7 +29,7 @@ router.post(
 router.get(
   '/:id',
   authenticate,
-  requireRole(['admin', 'stylist']),  //      restrict to admin/stylist
+  requireRole('ADMIN', 'STAFF'),  // restrict to admin/staff
   getWaitlistEntryHandler
 );
 
@@ -37,7 +37,7 @@ router.get(
 router.get(
   '/',
   authenticate,
-  requireRole(['admin', 'stylist']),  //      restrict to admin/stylist
+  requireRole('ADMIN', 'STAFF'),  // restrict to admin/staff
   getWaitlistEntriesHandler
 );
 
@@ -45,7 +45,7 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  requireRole(['admin', 'stylist']),  //      restrict to admin/stylist
+  requireRole('ADMIN', 'STAFF'),  // restrict to admin/staff
   validateWaitlistUpdate,
   updateWaitlistEntryHandler
 );
@@ -54,7 +54,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  requireRole('admin'),              //      only admin can delete
+  requireRole('ADMIN'),  // only admin can delete
   deleteWaitlistEntryHandler
 );
 

@@ -6,6 +6,7 @@ import {
   getSlotById,
   updateSlot,
   deleteSlot,
+  getAvailableSlots,
 } from '../controllers/slotController.js';
 import { validateSlotCreate, validateSlotUpdate } from '../validators/slotValidator.js';
 import { authenticate } from '../auth/authMiddleware.js';
@@ -14,6 +15,7 @@ import { requireRole } from '../middleware/roleMiddleware.js';
 const router = express.Router();
 
 // Public: clients need to see availability before/while booking.
+router.get('/available', getAvailableSlots);
 router.get('/', getSlots);
 router.get('/:id', getSlotById);
 

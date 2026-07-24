@@ -1,4 +1,4 @@
- // models/settings.js
+// models/settings.js
 import { prisma } from '../lib/prisma.js';
 
 

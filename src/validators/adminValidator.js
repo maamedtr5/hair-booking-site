@@ -1,4 +1,4 @@
- // validators/adminValidator.js
+// validators/adminValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';

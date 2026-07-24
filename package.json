@@ -4,6 +4,7 @@
   "main": "src/Server.js",
   "type": "module",
   "scripts": {
+    "start": "node src/Server.js",
     "dev": "nodemon src/Server.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "seed": "node prisma/seed.js"

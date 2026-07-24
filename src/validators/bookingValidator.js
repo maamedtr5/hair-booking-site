@@ -1,4 +1,4 @@
- // validators/bookingValidator.js
+// validators/bookingValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';

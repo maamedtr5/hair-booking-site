@@ -1,4 +1,4 @@
- // validators/waitlistValidator.js
+// validators/waitlistValidator.js
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isFutureDate } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';

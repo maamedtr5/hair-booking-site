@@ -1,4 +1,4 @@
- import { prisma } from '../lib/prisma.js';
+import { prisma } from '../lib/prisma.js';
 
 
 // Fetch notifications with pagination, filtering, and sorting

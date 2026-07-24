@@ -1,4 +1,4 @@
- // services/googleCalendarService.js
+// services/googleCalendarService.js
 import { google } from 'googleapis';
 import { prisma } from '../lib/prisma.js';
 
