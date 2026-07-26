@@ -33,6 +33,9 @@ export const isFutureDate = (value) => {
 
 /**
  * Custom validator: Check if date is within business hours
+ * @deprecated Superseded by utils/businessHours.js's isWithinBusinessHours(),
+ * which reads the admin-configurable schedule instead of this fixed one.
+ * Left in place only in case anything still imports it directly.
  */
 export const isBusinessHours = (value) => {
   const date = new Date(value);

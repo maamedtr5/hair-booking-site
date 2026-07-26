@@ -1,7 +1,8 @@
 // validators/appointmentValidator.js (add this to existing)
 import { body, param } from 'express-validator';
-import { handleValidationErrors, isFutureDate, isBusinessHours } from './validationHelpers.js';
+import { handleValidationErrors, isFutureDate } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
+import { getBusinessHoursConfig, isWithinBusinessHours } from '../utils/businessHours.js';
 
 
 export const validateAppointmentCreate = [
@@ -45,9 +46,10 @@ export const validateAppointmentCreate = [
       }
       return true;
     })
-    .custom((value) => {
-      if (!isBusinessHours(value)) {
-        throw new Error('Appointment must be during business hours (Mon-Sat, 9 AM - 6 PM)');
+    .custom(async (value) => {
+      const config = await getBusinessHoursConfig();
+      if (!isWithinBusinessHours(new Date(value), config)) {
+        throw new Error('Appointment must be during business hours');
       }
       return true;
     }),
@@ -141,8 +143,9 @@ export const validateAppointmentUpdate = [
       }
       return true;
     })
-    .custom((value) => {
-      if (!isBusinessHours(value)) {
+    .custom(async (value) => {
+      const config = await getBusinessHoursConfig();
+      if (!isWithinBusinessHours(new Date(value), config)) {
         throw new Error('Appointment must be during business hours');
       }
       return true;

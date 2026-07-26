@@ -2,6 +2,7 @@
 import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { computeAvailableSlots } from '../utils/availability.js';
+import { getBusinessHoursConfig, getDayBounds } from '../utils/businessHours.js';
 
 // Utility: sanitize nested appointment/client data
 function sanitizeSlot(slot) {
@@ -111,6 +112,13 @@ export const getAvailableSlots = async (req, res) => {
 
     const durationMinutes = parseInt(duration, 10) || 60;
 
+    const hoursConfig = await getBusinessHoursConfig();
+    const [y, m, d] = date.split('-').map(Number);
+    const dayBounds = getDayBounds(new Date(y, m - 1, d).getDay(), hoursConfig);
+    if (!dayBounds) {
+      return sendSuccess(res, []); // salon closed that day
+    }
+
     let staffIds;
     if (requestedStaffId) {
       const staff = await prisma.staff.findUnique({ where: { id: requestedStaffId } });
@@ -153,6 +161,7 @@ export const getAvailableSlots = async (req, res) => {
       staffIds,
       busyByStaff,
       durationMinutes,
+      dayBounds,
     });
 
     // Shaped to match the frontend's Slot type (id/appointmentId aren't

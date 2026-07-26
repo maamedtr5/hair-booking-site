@@ -8,6 +8,7 @@ import { authenticate } from './authMiddleware.js';
 const router = express.Router();
 
 
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 50,

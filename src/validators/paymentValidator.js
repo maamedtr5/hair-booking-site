@@ -8,7 +8,7 @@ export const validatePaymentCreate = [
     .isInt({ min: 1 }).withMessage('Invalid booking ID'),
 
   body('amount')
-    .notEmpty().withMessage('Amount is required')
+    .optional() // server always computes the authoritative amount itself; this is ignored if sent
     .isFloat({ min: 0.01 }).withMessage('Amount must be greater than 0')
     .custom((value) => {
       // Max 1 million GHS

@@ -8,7 +8,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 const FULL_INCLUDE = {
   service: true,
   staff: { include: { user: true } },
-  booking: { include: { client: { include: { user: true } } } },
+  booking: { include: { client: { include: { user: true } }, payment: true } },
 };
 
 // Book an appointment — open to guests and logged-in clients alike.

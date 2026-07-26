@@ -1,11 +1,17 @@
 import { handlePayment } from '../services/payment/providerService.js';
 import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { getPaymentPolicyConfig, computeDepositAmount } from '../utils/paymentPolicy.js';
 
 // Computes the authoritative charge amount server-side from the booking's
 // service price (+ active promocode discount), rather than trusting whatever
 // `amount` the client sends. A client-supplied amount must never be charged
 // as-is — that would let anyone pay any price they choose.
+//
+// When the admin's payment policy requires a deposit, the amount charged
+// at booking time is the deposit only — not the full price. The rest is
+// collected in person (cash/MoMo, directly between client and staff/admin)
+// and logged afterwards via recordManualPayment.
 async function resolveBookingAmount(bookingId) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -19,20 +25,38 @@ async function resolveBookingAmount(bookingId) {
     throw new Error('Booking not found');
   }
 
-  let amount = booking.appointment.service.price;
+  let fullPrice = booking.appointment.service.price;
 
   if (booking.promocode && booking.promocode.isActive) {
     const now = new Date();
     if (now >= booking.promocode.validFrom && now <= booking.promocode.validUntil) {
-      amount =
+      fullPrice =
         booking.promocode.type === 'PERCENTAGE'
-          ? amount - (amount * booking.promocode.discount) / 100
-          : Math.max(0, amount - booking.promocode.discount);
+          ? fullPrice - (fullPrice * booking.promocode.discount) / 100
+          : Math.max(0, fullPrice - booking.promocode.discount);
     }
   }
 
-  return { booking, amount };
+  const policy = await getPaymentPolicyConfig();
+  const amountDue = policy.requireDeposit ? computeDepositAmount(fullPrice, policy) : fullPrice;
+
+  return { booking, fullPrice, amountDue, isDeposit: policy.requireDeposit };
 }
+
+// Lets the frontend show the client what they'll actually be charged
+// (full price, deposit-only, or nothing under pay-after) before they
+// commit to paying — without duplicating the pricing logic client-side.
+export const getPaymentQuote = async (req, res) => {
+  try {
+    const bookingId = parseInt(req.params.bookingId, 10);
+    if (!bookingId) return sendError(res, 'A valid bookingId is required', 400);
+
+    const { fullPrice, amountDue, isDeposit } = await resolveBookingAmount(bookingId);
+    return sendSuccess(res, { fullPrice, amountDue, isDeposit });
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
 
 //   Initialize payment (creates a new record)
 export const initializePayment = async (req, res) => {
@@ -46,25 +70,74 @@ export const initializePayment = async (req, res) => {
       return sendError(res, 'bookingId is required', 400);
     }
 
-    const { amount } = await resolveBookingAmount(bookingId);
+    const { amountDue, isDeposit } = await resolveBookingAmount(bookingId);
 
-    const response = await handlePayment(provider, amount, metadata);
+    if (amountDue <= 0) {
+      return sendError(res, 'No payment is required for this booking.', 400);
+    }
+
+    const response = await handlePayment(provider, amountDue, metadata);
 
     const payment = await prisma.payment.create({
       data: {
         bookingId,
-        amount,
+        amount: amountDue,
         method,
         provider,
         status: 'PENDING',
         transactionRef: response.reference,
         externalId: response.externalId,
-        metadata,
+        metadata: { ...metadata, isDeposit },
       },
     });
 
     //    201 Created for new resource
-    return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl }, 201);
+    return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl, isDeposit }, 201);
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
+
+// Staff/admin records a payment collected in person (cash or MoMo,
+// directly between client and staff/admin) — not routed through Paystack.
+// This is how the remaining balance (or the full amount, under the
+// default pay-after policy) gets tracked for reporting.
+export const recordManualPayment = async (req, res) => {
+  try {
+    const { bookingId, amount, method } = req.body;
+
+    if (!bookingId) return sendError(res, 'bookingId is required', 400);
+    if (!amount || amount <= 0) return sendError(res, 'A positive amount is required', 400);
+    if (!['CASH', 'MOBILE_MONEY'].includes(method)) {
+      return sendError(res, 'method must be CASH or MOBILE_MONEY', 400);
+    }
+
+    const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
+    if (!booking) return sendError(res, 'Booking not found', 404);
+
+    const existing = await prisma.payment.findUnique({ where: { bookingId } });
+
+    const payment = existing
+      ? await prisma.payment.update({
+          where: { bookingId },
+          data: {
+            amount: existing.amount + amount,
+            method,
+            provider: method,
+            status: 'SUCCESS',
+          },
+        })
+      : await prisma.payment.create({
+          data: {
+            bookingId,
+            amount,
+            method,
+            provider: method, // PaymentProvider also has CASH/MOBILE_MONEY values
+            status: 'SUCCESS',
+          },
+        });
+
+    return sendSuccess(res, payment, existing ? 200 : 201, 'Payment recorded');
   } catch (err) {
     return sendError(res, err.message, 400);
   }
