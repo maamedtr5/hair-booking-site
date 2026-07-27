@@ -3,15 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { getPaymentPolicyConfig, computeDepositAmount } from '../utils/paymentPolicy.js';
 
-// Computes the authoritative charge amount server-side from the booking's
-// service price (+ active promocode discount), rather than trusting whatever
-// `amount` the client sends. A client-supplied amount must never be charged
-// as-is — that would let anyone pay any price they choose.
-//
-// When the admin's payment policy requires a deposit, the amount charged
-// at booking time is the deposit only — not the full price. The rest is
-// collected in person (cash/MoMo, directly between client and staff/admin)
-// and logged afterwards via recordManualPayment.
+
 async function resolveBookingAmount(bookingId) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
@@ -43,9 +35,7 @@ async function resolveBookingAmount(bookingId) {
   return { booking, fullPrice, amountDue, isDeposit: policy.requireDeposit };
 }
 
-// Lets the frontend show the client what they'll actually be charged
-// (full price, deposit-only, or nothing under pay-after) before they
-// commit to paying — without duplicating the pricing logic client-side.
+
 export const getPaymentQuote = async (req, res) => {
   try {
     const bookingId = parseInt(req.params.bookingId, 10);
@@ -58,7 +48,8 @@ export const getPaymentQuote = async (req, res) => {
   }
 };
 
-//   Initialize payment (creates a new record)
+
+
 export const initializePayment = async (req, res) => {
   const { bookingId, method, provider, metadata } = req.body;
 
@@ -70,38 +61,47 @@ export const initializePayment = async (req, res) => {
       return sendError(res, 'bookingId is required', 400);
     }
 
-    const { amountDue, isDeposit } = await resolveBookingAmount(bookingId);
+    const { booking, amountDue, isDeposit } = await resolveBookingAmount(bookingId);
+
+    if (booking.status === 'CANCELLED') {
+      return sendError(res, 'This booking has been cancelled and can no longer be paid for.', 400);
+    }
 
     if (amountDue <= 0) {
       return sendError(res, 'No payment is required for this booking.', 400);
     }
 
+    const existing = await prisma.payment.findUnique({ where: { bookingId } });
+
+    if (existing && existing.status === 'SUCCESS') {
+      return sendError(res, 'This booking has already been paid for.', 409);
+    }
+
     const response = await handlePayment(provider, amountDue, metadata);
 
-    const payment = await prisma.payment.create({
-      data: {
-        bookingId,
-        amount: amountDue,
-        method,
-        provider,
-        status: 'PENDING',
-        transactionRef: response.reference,
-        externalId: response.externalId,
-        metadata: { ...metadata, isDeposit },
-      },
-    });
+    const paymentData = {
+      amount: amountDue,
+      method,
+      provider,
+      status: 'PENDING',
+      transactionRef: response.reference,
+      externalId: response.externalId,
+      metadata: { ...metadata, isDeposit },
+      errorMessage: null,
+    };
 
-    //    201 Created for new resource
-    return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl, isDeposit }, 201);
+    const payment = existing
+      ? await prisma.payment.update({ where: { bookingId }, data: paymentData })
+      : await prisma.payment.create({ data: { bookingId, ...paymentData } });
+
+ 
+    return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl, isDeposit }, existing ? 200 : 201);
   } catch (err) {
     return sendError(res, err.message, 400);
   }
 };
 
-// Staff/admin records a payment collected in person (cash or MoMo,
-// directly between client and staff/admin) — not routed through Paystack.
-// This is how the remaining balance (or the full amount, under the
-// default pay-after policy) gets tracked for reporting.
+
 export const recordManualPayment = async (req, res) => {
   try {
     const { bookingId, amount, method } = req.body;
@@ -116,6 +116,11 @@ export const recordManualPayment = async (req, res) => {
     if (!booking) return sendError(res, 'Booking not found', 404);
 
     const existing = await prisma.payment.findUnique({ where: { bookingId } });
+
+   
+    if (existing && existing.status === 'SUCCESS') {
+      return sendError(res, 'This booking has already been marked as paid.', 409);
+    }
 
     const payment = existing
       ? await prisma.payment.update({

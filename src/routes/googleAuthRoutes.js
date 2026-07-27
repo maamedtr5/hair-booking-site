@@ -1,5 +1,6 @@
-// routes/googleAuthRoutes.js
+ // routes/googleAuthRoutes.js
 import express from 'express';
+import jwt from 'jsonwebtoken';
 import {
   getAuthUrl,
   getTokensFromCode,
@@ -9,6 +10,9 @@ import { prisma } from '../lib/prisma.js';
 
 const router = express.Router();
 
+
+const STATE_PURPOSE = 'google_calendar_link';
+
 /**
  * GET /auth/google/calendar
  * Redirect user to Google OAuth consent screen
@@ -16,11 +20,14 @@ const router = express.Router();
 router.get('/google/calendar', authenticate, (req, res) => {
   try {
     const authUrl = getAuthUrl();
-    
-    // Store user ID in session or pass as state parameter
-    const state = Buffer.from(JSON.stringify({ userId: req.user.id })).toString('base64');
-    const urlWithState = `${authUrl}&state=${state}`;
-    
+
+    const state = jwt.sign(
+      { userId: req.user.id, purpose: STATE_PURPOSE },
+      process.env.JWT_SECRET,
+      { expiresIn: '10m' }
+    );
+    const urlWithState = `${authUrl}&state=${encodeURIComponent(state)}`;
+
     res.json({
       success: true,
       authUrl: urlWithState,
@@ -50,8 +57,26 @@ router.get('/google/callback', async (req, res) => {
       });
     }
 
-    // Decode state to get user ID
-    const { userId } = JSON.parse(Buffer.from(state, 'base64').toString());
+    if (!state) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing state parameter',
+      });
+    }
+
+    // Verify the state was actually issued by us (signature) and hasn't
+    // expired or been repurposed — not just base64-decoded and trusted.
+    let userId;
+    try {
+      const payload = jwt.verify(state, process.env.JWT_SECRET);
+      if (payload.purpose !== STATE_PURPOSE || !payload.userId) {
+        throw new Error('Invalid state payload');
+      }
+      userId = payload.userId;
+    } catch (stateErr) {
+      console.error('Invalid or forged Google OAuth state:', stateErr.message);
+      return res.redirect(`${process.env.FRONTEND_URL}/settings/calendar?error=true`);
+    }
 
     // Exchange code for tokens
     const tokens = await getTokensFromCode(code);

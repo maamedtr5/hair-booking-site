@@ -11,6 +11,56 @@ const FULL_INCLUDE = {
   booking: { include: { client: { include: { user: true } }, payment: true } },
 };
 
+
+const MAX_SERVICE_DURATION_MINUTES = 8 * 60;
+
+
+async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId }) {
+  if (!staffId) return; // No specific staff requested — nothing to conflict against.
+
+  const lookbackStart = new Date(start.getTime() - MAX_SERVICE_DURATION_MINUTES * 60000);
+
+  const candidates = await tx.appointment.findMany({
+    where: {
+      staffId,
+      status: { notIn: ['CANCELLED'] },
+      date: { gte: lookbackStart, lt: end },
+      ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
+    },
+    include: { service: true },
+  });
+
+  const conflict = candidates.find((appt) => {
+    const apptEnd = new Date(appt.date.getTime() + appt.service.duration * 60000);
+    return apptEnd > start; // overlaps [start, end)
+  });
+
+  if (conflict) {
+    const err = new Error(
+      'This staff member already has an appointment during that time. Please choose a different time or staff member.'
+    );
+    err.status = 409;
+    throw err;
+  }
+}
+
+// Runs `work(tx)` inside a Serializable transaction, retrying once if
+// Postgres reports a serialization conflict (Prisma error code P2034 —
+// two concurrent transactions both tried to book the same slot). One
+// retry is enough here: the loser simply re-checks availability against
+// the now-committed winner and correctly fails with a 409 instead of
+// silently double-booking.
+async function withConflictCheck(work) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await prisma.$transaction(work, { isolationLevel: 'Serializable' });
+    } catch (err) {
+      if (err.code === 'P2034' && attempt === 0) continue; // retry once
+      throw err;
+    }
+  }
+}
+
 // Book an appointment — open to guests and logged-in clients alike.
 // Creates the Appointment + Booking together so the frontend only makes
 // one call to "book now".
@@ -20,12 +70,25 @@ export const createAppointment = async (req, res) => {
     const { clientId, contactEmail, contactPhone, contactName } =
       await resolveClientForRequest(req);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withConflictCheck(async (tx) => {
+      const service = await tx.service.findUnique({ where: { id: parseInt(serviceId, 10) } });
+      if (!service) {
+        const err = new Error('Service not found');
+        err.status = 404;
+        throw err;
+      }
+
+      const start = new Date(date);
+      const end = new Date(start.getTime() + service.duration * 60000);
+      const staffIdInt = staffId ? parseInt(staffId, 10) : null;
+
+      await assertSlotAvailable(tx, { staffId: staffIdInt, start, end });
+
       const appointment = await tx.appointment.create({
         data: {
           serviceId: parseInt(serviceId, 10),
-          staffId: staffId ? parseInt(staffId, 10) : null,
-          date: new Date(date),
+          staffId: staffIdInt,
+          date: start,
           notes: notes ?? null,
         },
       });
@@ -71,6 +134,10 @@ export const createAppointment = async (req, res) => {
   }
 };
 
+// Guest-safe lookup: owner, staff/admin, or a matching ?email=. Appointment
+// records carry the client's name/email/phone/notes, so — same as
+// bookingController.getBooking — this must never be reachable by an
+// arbitrary caller just because they know or can guess an id.
 export const getAppointment = async (req, res) => {
   try {
     const appointment = await prisma.appointment.findUnique({
@@ -78,12 +145,30 @@ export const getAppointment = async (req, res) => {
       include: FULL_INCLUDE,
     });
     if (!appointment) return sendError(res, 'Appointment not found', 404);
+
+    const ownerEmail = appointment.booking?.client?.user?.email;
+    const isOwner = req.user && appointment.booking?.client?.userId === req.user.id;
+    const isStaffOrAdmin = req.user && ['ADMIN', 'STAFF'].includes(req.user.role);
+    const emailMatches =
+      req.query.email && ownerEmail && req.query.email.toLowerCase() === ownerEmail.toLowerCase();
+
+    if (!isOwner && !isStaffOrAdmin && !emailMatches) {
+      return sendError(
+        res,
+        'Not authorized to view this appointment. Pass ?email= matching the booking contact email, or log in.',
+        403
+      );
+    }
+
     return sendSuccess(res, appointment);
   } catch (err) {
     return sendError(res, err.message, 400);
   }
 };
 
+// Staff/admin only (route-level) — this lists every appointment in the
+// system, so unlike the single-record lookup above there's no guest/email
+// fallback that makes sense here.
 export const getAppointments = async (req, res) => {
   try {
     const skip = parseInt(req.query.skip, 10) || 0;
@@ -103,14 +188,45 @@ export const getAppointments = async (req, res) => {
 // Staff/admin only (route-level).
 export const updateAppointment = async (req, res) => {
   try {
-    const updated = await prisma.appointment.update({
-      where: { id: parseInt(req.params.id, 10) },
-      data: req.body,
-      include: FULL_INCLUDE,
+    const id = parseInt(req.params.id, 10);
+
+    const updated = await withConflictCheck(async (tx) => {
+      // Only re-check availability if this update actually touches the
+      // time or the assigned staff member — a status/notes-only edit
+      // shouldn't pay the conflict-check cost or risk a false 409.
+      if (req.body.date || req.body.staffId !== undefined) {
+        const existing = await tx.appointment.findUnique({
+          where: { id },
+          include: { service: true },
+        });
+        if (!existing) {
+          const err = new Error('Appointment not found');
+          err.status = 404;
+          throw err;
+        }
+
+        const staffId =
+          req.body.staffId !== undefined
+            ? req.body.staffId
+              ? parseInt(req.body.staffId, 10)
+              : null
+            : existing.staffId;
+        const start = req.body.date ? new Date(req.body.date) : existing.date;
+        const end = new Date(start.getTime() + existing.service.duration * 60000);
+
+        await assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId: id });
+      }
+
+      return tx.appointment.update({
+        where: { id },
+        data: req.body,
+        include: FULL_INCLUDE,
+      });
     });
+
     return sendSuccess(res, updated);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, err.message, err.status || 400);
   }
 };
 
@@ -140,6 +256,9 @@ export const deleteAppointment = async (req, res) => {
   }
 };
 
+// Staff/admin only (route-level) — clients hit /appointments/client/:clientId
+// while authenticated, and the check below still confirms they own that
+// clientId even though the route already requires a valid session.
 export const getAppointmentsByClient = async (req, res) => {
   try {
     const clientId = parseInt(req.params.clientId, 10);
@@ -159,6 +278,8 @@ export const getAppointmentsByClient = async (req, res) => {
   }
 };
 
+// Staff/admin only (route-level) — returns every appointment for a staff
+// member, including client PII, so this must not be publicly reachable.
 export const getAppointmentsByStaff = async (req, res) => {
   try {
     const staffId = parseInt(req.params.staffId, 10);
@@ -173,6 +294,7 @@ export const getAppointmentsByStaff = async (req, res) => {
   }
 };
 
+// Staff/admin only (route-level).
 export const getAppointmentsByDate = async (req, res) => {
   try {
     const start = new Date(req.params.date);
@@ -189,6 +311,7 @@ export const getAppointmentsByDate = async (req, res) => {
   }
 };
 
+// Staff/admin only (route-level).
 export const getAppointmentsByStatus = async (req, res) => {
   try {
     const appointments = await prisma.appointment.findMany({
@@ -248,23 +371,35 @@ export const rescheduleAppointment = async (req, res) => {
     const id = parseInt(req.params.id, 10);
     const { newDate } = req.body;
 
-    const existing = await prisma.appointment.findUnique({ where: { id }, include: FULL_INCLUDE });
-    if (!existing) return sendError(res, 'Appointment not found', 404);
+    const updated = await withConflictCheck(async (tx) => {
+      const existing = await tx.appointment.findUnique({ where: { id }, include: FULL_INCLUDE });
+      if (!existing) {
+        const err = new Error('Appointment not found');
+        err.status = 404;
+        throw err;
+      }
 
-    const ownerEmail = existing.booking?.client?.user?.email;
-    const isOwner = req.user && existing.booking?.client?.userId === req.user.id;
-    const isStaffOrAdmin = req.user && ['ADMIN', 'STAFF'].includes(req.user.role);
-    const emailMatches =
-      req.body.email && ownerEmail && req.body.email.toLowerCase() === ownerEmail.toLowerCase();
+      const ownerEmail = existing.booking?.client?.user?.email;
+      const isOwner = req.user && existing.booking?.client?.userId === req.user.id;
+      const isStaffOrAdmin = req.user && ['ADMIN', 'STAFF'].includes(req.user.role);
+      const emailMatches =
+        req.body.email && ownerEmail && req.body.email.toLowerCase() === ownerEmail.toLowerCase();
 
-    if (!isOwner && !isStaffOrAdmin && !emailMatches) {
-      return sendError(res, 'Not authorized to reschedule this appointment', 403);
-    }
+      if (!isOwner && !isStaffOrAdmin && !emailMatches) {
+        const err = new Error('Not authorized to reschedule this appointment');
+        err.status = 403;
+        throw err;
+      }
 
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: { date: new Date(newDate), status: 'RESCHEDULED' },
-      include: FULL_INCLUDE,
+      const start = new Date(newDate);
+      const end = new Date(start.getTime() + existing.service.duration * 60000);
+      await assertSlotAvailable(tx, { staffId: existing.staffId, start, end, excludeAppointmentId: id });
+
+      return tx.appointment.update({
+        where: { id },
+        data: { date: start, status: 'RESCHEDULED' },
+        include: FULL_INCLUDE,
+      });
     });
 
     const client = updated.booking?.client;
@@ -283,15 +418,10 @@ export const rescheduleAppointment = async (req, res) => {
 
     return sendSuccess(res, updated, 200, 'Appointment rescheduled');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, err.message, err.status || 400);
   }
 };
 
-// ADMIN only. NOTE: calendar resync against googleCalendarService is
-// left as a TODO — it needs a product decision on whose connected
-// calendar an admin-created event syncs to. Reminder scheduling is
-// wired to the real reminderJobs export names (the previous version
-// referenced functions that didn't exist).
 export const internalUpdateAppointment = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
