@@ -1,4 +1,4 @@
-// src/services/guestClientService.js
+ // src/services/guestClientService.js
 
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
@@ -52,26 +52,22 @@ export async function resolveClientForRequest(req) {
     include: { client: true },
   });
 
+  // A guest checkout is unauthenticated by definition — we have no way to
+  // verify the person typing this email actually owns it. Previously, if
+  // the email matched a real registered account, the booking was silently
+  // attached to that account's client record. That means anyone who knows
+  // (or guesses) another person's email can create appointments under
+  // their identity with no password required — a low-effort impersonation
+  // vector, not just a data-hygiene issue. Block it instead and tell them
+  // to sign in, the same way most booking systems handle "this email is
+  // already registered."
   if (existingUser) {
-    if (existingUser.client) {
-      return {
-        clientId: existingUser.client.id,
-        contactEmail: existingUser.email,
-        contactPhone: existingUser.client.phone ?? guestPhone,
-        contactName: existingUser.name,
-      };
-    }
-    const client = await prisma.client.create({
-      data: { userId: existingUser.id, phone: guestPhone },
-    });
-    return {
-      clientId: client.id,
-      contactEmail: existingUser.email,
-      contactPhone: guestPhone,
-      contactName: existingUser.name,
-    };
+    const err = new Error(
+      'An account already exists with this email. Please sign in to continue booking, or use a different email to book as a guest.'
+    );
+    err.status = 409;
+    throw err;
   }
-
 
   const randomPassword = crypto.randomBytes(32).toString('hex');
   const hashedPassword = await bcrypt.hash(randomPassword, 10);

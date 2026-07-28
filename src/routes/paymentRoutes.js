@@ -1,9 +1,10 @@
-// src/routes/paymentRoutes.js
+ // src/routes/paymentRoutes.js
 import express from 'express';
 import {
   initializePayment,
   markPaymentSuccess,
   markPaymentFailed,
+  markPaymentRefunded,
   getPayments,
   recordManualPayment,
   getPaymentQuote,
@@ -55,7 +56,18 @@ router.put(
   markPaymentFailed
 );
 
-// Get all payments (paginated)
+// Marks a REFUND_PENDING payment (set automatically when a paid booking
+// is cancelled — see appointmentController.deleteAppointment) as actually
+// refunded once staff/admin have processed it on the Paystack/MoMo side.
+router.put(
+  '/:id/refunded',
+  authenticate,
+  authorizeRoles('ADMIN', 'STAFF'),
+  markPaymentRefunded
+);
+
+// Get all payments (paginated). Supports ?status=REFUND_PENDING so the
+// admin UI can build a "needs action" view.
 router.get(
   '/',
   authenticate,

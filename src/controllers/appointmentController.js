@@ -1,4 +1,4 @@
-// src/controllers/appointmentController.js
+ // src/controllers/appointmentController.js
 import { prisma } from '../lib/prisma.js';
 import { sendEmail } from '../services/emailService.js';
 import { sendAppointmentReminderSMS } from '../services/smsService.js';
@@ -11,10 +11,27 @@ const FULL_INCLUDE = {
   booking: { include: { client: { include: { user: true } }, payment: true } },
 };
 
+// Appointments in these statuses no longer hold a real slot on the
+// calendar, so they never count as a conflict for a new/rescheduled booking.
+const NON_BLOCKING_STATUSES = ['CANCELLED', 'NO_SHOW'];
 
+// Generous upper bound on how long any single service could ever run.
+// Used only to keep the conflict-check query from scanning the entire
+// appointment history for a staff member — actual overlap is still
+// computed precisely from each candidate's real service.duration.
 const MAX_SERVICE_DURATION_MINUTES = 8 * 60;
 
-
+// Guards against double-booking a staff member. Without this, nothing
+// stops two different requests (two different clients, or the same
+// client double-submitting) from landing on the same staff member at
+// overlapping times — the "available slots" endpoint only ever informed
+// what the UI *displays*, it never gated what the write endpoints
+// actually allowed onto the calendar.
+//
+// `tx` must be a Prisma transaction client running at Serializable
+// isolation (see withConflictCheck below) so two concurrent requests
+// racing for the same slot can't both pass this check before either
+// commits.
 async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId }) {
   if (!staffId) return; // No specific staff requested — nothing to conflict against.
 
@@ -23,7 +40,7 @@ async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointment
   const candidates = await tx.appointment.findMany({
     where: {
       staffId,
-      status: { notIn: ['CANCELLED'] },
+      status: { notIn: NON_BLOCKING_STATUSES },
       date: { gte: lookbackStart, lt: end },
       ...(excludeAppointmentId ? { id: { not: excludeAppointmentId } } : {}),
     },
@@ -61,12 +78,38 @@ async function withConflictCheck(work) {
   }
 }
 
+// Validates a promo code the same way resolveBookingAmount will when the
+// payment is quoted, so a client can never attach a code that's expired,
+// deactivated, or doesn't exist — this runs inside the same transaction
+// as the booking write so the check and the attach are atomic.
+async function resolvePromocodeId(tx, promoCode) {
+  if (!promoCode) return null;
+
+  const code = String(promoCode).toUpperCase().trim();
+  const promo = await tx.promocode.findUnique({ where: { code } });
+
+  if (!promo) {
+    const err = new Error('That promo code was not found.');
+    err.status = 400;
+    throw err;
+  }
+
+  const now = new Date();
+  if (!promo.isActive || now < promo.validFrom || now > promo.validUntil) {
+    const err = new Error('That promo code is not currently valid.');
+    err.status = 400;
+    throw err;
+  }
+
+  return promo.id;
+}
+
 // Book an appointment — open to guests and logged-in clients alike.
 // Creates the Appointment + Booking together so the frontend only makes
 // one call to "book now".
 export const createAppointment = async (req, res) => {
   try {
-    const { serviceId, staffId, date, notes } = req.body;
+    const { serviceId, staffId, date, notes, promoCode } = req.body;
     const { clientId, contactEmail, contactPhone, contactName } =
       await resolveClientForRequest(req);
 
@@ -83,6 +126,7 @@ export const createAppointment = async (req, res) => {
       const staffIdInt = staffId ? parseInt(staffId, 10) : null;
 
       await assertSlotAvailable(tx, { staffId: staffIdInt, start, end });
+      const promocodeId = await resolvePromocodeId(tx, promoCode);
 
       const appointment = await tx.appointment.create({
         data: {
@@ -93,7 +137,7 @@ export const createAppointment = async (req, res) => {
         },
       });
       await tx.booking.create({
-        data: { appointmentId: appointment.id, clientId },
+        data: { appointmentId: appointment.id, clientId, promocodeId },
       });
       return tx.appointment.findUnique({
         where: { id: appointment.id },
@@ -233,6 +277,14 @@ export const updateAppointment = async (req, res) => {
 // Staff/admin only. Soft-cancels rather than hard-deleting so revenue
 // reporting and history stay intact — a hard delete would also violate
 // the Booking→Appointment foreign key if a booking exists.
+//
+// If the booking had already been paid (Payment.status === SUCCESS),
+// cancelling it now flips the payment to REFUND_PENDING instead of
+// leaving it looking like an untouched successful charge. This doesn't
+// process a refund automatically (that's a Paystack/MoMo operation with
+// real money and needs a human decision) — it just makes sure "this
+// client paid and then the booking was cancelled" is impossible to miss
+// in the payments list instead of silently falling through the cracks.
 export const deleteAppointment = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -247,10 +299,45 @@ export const deleteAppointment = async (req, res) => {
           where: { id: appointment.booking.id },
           data: { status: 'CANCELLED' },
         });
+        if (appointment.booking.payment?.status === 'SUCCESS') {
+          await tx.payment.update({
+            where: { id: appointment.booking.payment.id },
+            data: { status: 'REFUND_PENDING' },
+          });
+        }
       }
       return appointment;
     });
     return sendSuccess(res, result, 200, 'Appointment cancelled');
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
+
+// Staff/admin only. Marks a client as having not shown up — kept
+// separate from CANCELLED so reporting can tell the difference, and
+// deliberately does NOT touch the payment: a no-show is the scenario
+// where a deposit is typically forfeited rather than refunded, so unlike
+// deleteAppointment above, no REFUND_PENDING flag is set here. If your
+// policy is ever to refund no-shows too, that decision belongs here.
+export const markAppointmentNoShow = async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const result = await prisma.$transaction(async (tx) => {
+      const appointment = await tx.appointment.update({
+        where: { id },
+        data: { status: 'NO_SHOW' },
+        include: FULL_INCLUDE,
+      });
+      if (appointment.booking) {
+        await tx.booking.update({
+          where: { id: appointment.booking.id },
+          data: { status: 'COMPLETED' }, // the appointment slot has passed either way
+        });
+      }
+      return appointment;
+    });
+    return sendSuccess(res, result, 200, 'Appointment marked as no-show');
   } catch (err) {
     return sendError(res, err.message, 400);
   }
@@ -328,18 +415,35 @@ export const getAppointmentsByStatus = async (req, res) => {
 export const bulkCancelAppointments = async (req, res) => {
   try {
     const { appointmentIds } = req.body;
-    const cancelled = await prisma.appointment.findMany({
-      where: { id: { in: appointmentIds } },
-      include: FULL_INCLUDE,
-    });
+    const cancelled = await prisma.$transaction(async (tx) => {
+      const toCancel = await tx.appointment.findMany({
+        where: { id: { in: appointmentIds } },
+        include: FULL_INCLUDE,
+      });
 
-    await prisma.appointment.updateMany({
-      where: { id: { in: appointmentIds } },
-      data: { status: 'CANCELLED' },
-    });
-    await prisma.booking.updateMany({
-      where: { appointmentId: { in: appointmentIds } },
-      data: { status: 'CANCELLED' },
+      await tx.appointment.updateMany({
+        where: { id: { in: appointmentIds } },
+        data: { status: 'CANCELLED' },
+      });
+      await tx.booking.updateMany({
+        where: { appointmentId: { in: appointmentIds } },
+        data: { status: 'CANCELLED' },
+      });
+
+      // Same refund-flagging as the single-cancel path — anything that
+      // was already SUCCESS-paid needs to surface as REFUND_PENDING
+      // instead of silently staying "paid" after the booking is gone.
+      const paidPaymentIds = toCancel
+        .filter((appt) => appt.booking?.payment?.status === 'SUCCESS')
+        .map((appt) => appt.booking.payment.id);
+      if (paidPaymentIds.length > 0) {
+        await tx.payment.updateMany({
+          where: { id: { in: paidPaymentIds } },
+          data: { status: 'REFUND_PENDING' },
+        });
+      }
+
+      return toCancel;
     });
 
     for (const appt of cancelled) {
@@ -422,6 +526,11 @@ export const rescheduleAppointment = async (req, res) => {
   }
 };
 
+// ADMIN only. NOTE: calendar resync against googleCalendarService is
+// left as a TODO — it needs a product decision on whose connected
+// calendar an admin-created event syncs to. Reminder scheduling is
+// wired to the real reminderJobs export names (the previous version
+// referenced functions that didn't exist).
 export const internalUpdateAppointment = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);

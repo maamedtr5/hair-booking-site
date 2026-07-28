@@ -127,6 +127,7 @@ enum AppointmentStatus {
   COMPLETED
   CANCELLED
   RESCHEDULED
+  NO_SHOW
 }
 
 model Slot {
@@ -216,6 +217,7 @@ enum PaymentStatus {
   PENDING
   SUCCESS
   FAILED
+  REFUND_PENDING // was SUCCESS, booking got cancelled — needs admin to process a refund
   REFUNDED
 }
 

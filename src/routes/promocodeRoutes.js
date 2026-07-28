@@ -17,9 +17,13 @@ router.post(
 );
 
 // GET routes
-router.get('/:id', promocodeController.getPromocode);
+// The full list (and lookup-by-id) reveal every promo code including
+// ones not yet announced — that's business-sensitive, not something a
+// browsing client should be able to enumerate. Checkout only ever needs
+// to validate a code the client already typed in, which is /code/:code.
+router.get('/:id', authenticate, requireRole('ADMIN', 'STAFF'), promocodeController.getPromocode);
 router.get('/code/:code', promocodeController.getPromocodeByCode);
-router.get('/', promocodeController.getPromocodes);
+router.get('/', authenticate, requireRole('ADMIN', 'STAFF'), promocodeController.getPromocodes);
 
 // PUT /promocodes/:id
 router.put(

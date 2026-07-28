@@ -4,27 +4,32 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import { computeAvailableSlots } from '../utils/availability.js';
 import { getBusinessHoursConfig, getDayBounds } from '../utils/businessHours.js';
 
-// Utility: sanitize nested appointment/client data
+// Slot -> Appointment -> Booking -> Client -> User is the real relation
+// chain (Appointment has no direct `client`/`user` field). The previous
+// version included `appointment: { client: true, user: true }`, which
+// doesn't exist on the Appointment model at all — every call to
+// createSlot/getSlots/getSlotById/updateSlot was throwing a Prisma
+// "unknown field" error and 500ing unconditionally.
+const SLOT_INCLUDE = {
+  appointment: {
+    include: {
+      service: true,
+      booking: { include: { client: { include: { user: true } } } },
+    },
+  },
+};
+
+// stripPasswords() in sendSuccess already strips any nested password hash
+// centrally, so this no longer needs to do it manually — kept as a no-op
+// passthrough so call sites below don't need to change shape.
 function sanitizeSlot(slot) {
-  if (!slot) return null;
-  const safeSlot = { ...slot };
-
-  if (safeSlot.appointment?.client?.password) {
-    const { password, ...safeClient } = safeSlot.appointment.client;
-    safeSlot.appointment.client = safeClient;
-  }
-  if (safeSlot.appointment?.user?.password) {
-    const { password, ...safeUser } = safeSlot.appointment.user;
-    safeSlot.appointment.user = safeUser;
-  }
-
-  return safeSlot;
+  return slot;
 }
 
 // Create Slot
 export const createSlot = async (req, res) => {
   try {
-    const slot = await prisma.slot.create({ data: req.body });
+    const slot = await prisma.slot.create({ data: req.body, include: SLOT_INCLUDE });
     return sendSuccess(res, sanitizeSlot(slot), 201);
   } catch (err) {
     return sendError(res, err.message, 400);
@@ -41,11 +46,7 @@ export const getSlots = async (req, res) => {
     const slots = await prisma.slot.findMany({
       skip,
       take,
-      include: {
-        appointment: {
-          include: { client: true, user: true }
-        }
-      },
+      include: SLOT_INCLUDE,
       orderBy: { startTime: 'asc' } // optional: order by start time
     });
 
@@ -61,7 +62,7 @@ export const getSlotById = async (req, res) => {
   try {
     const slot = await prisma.slot.findUnique({
       where: { id: parseInt(req.params.id) },
-      include: { appointment: { include: { client: true, user: true } } }
+      include: SLOT_INCLUDE,
     });
     if (!slot) {
       return sendError(res, 'Slot not found', 404);
@@ -78,7 +79,7 @@ export const updateSlot = async (req, res) => {
     const slot = await prisma.slot.update({
       where: { id: parseInt(req.params.id) },
       data: req.body,
-      include: { appointment: { include: { client: true, user: true } } }
+      include: SLOT_INCLUDE,
     });
     return sendSuccess(res, sanitizeSlot(slot));
   } catch (err) {
@@ -137,11 +138,13 @@ export const getAvailableSlots = async (req, res) => {
     const dayStart = new Date(`${date}T00:00:00`);
     const dayEnd = new Date(`${date}T23:59:59.999`);
 
+    // Appointments that no longer hold a real slot (cancelled / no-show)
+    // must not block the time from being offered again.
     const appointments = await prisma.appointment.findMany({
       where: {
         staffId: { in: staffIds },
         date: { gte: dayStart, lte: dayEnd },
-        status: { notIn: ['CANCELLED'] },
+        status: { notIn: ['CANCELLED', 'NO_SHOW'] },
       },
       include: { service: true },
     });

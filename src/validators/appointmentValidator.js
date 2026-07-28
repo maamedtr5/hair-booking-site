@@ -1,4 +1,4 @@
-// validators/appointmentValidator.js (add this to existing)
+ // validators/appointmentValidator.js (add this to existing)
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isFutureDate } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
@@ -58,6 +58,15 @@ export const validateAppointmentCreate = [
     .optional()
     .trim()
     .isLength({ max: 500 }).withMessage('Notes must not exceed 500 characters'),
+
+  // Real validity (exists, active, within date range) happens in the
+  // controller — it needs a DB lookup inside the same transaction as the
+  // booking write so the check-then-attach is atomic. This just bounds
+  // the shape so garbage can't reach that far.
+  body('promoCode')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 }).withMessage('Invalid promo code'),
 
   body('status')
     .optional()

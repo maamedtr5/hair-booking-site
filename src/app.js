@@ -1,9 +1,5 @@
 // src/app.js
-//
-// The Express app, built but not started. Split out from Server.js so it
-// can be imported directly by tests (supertest needs the app instance, not
-// a running server) without triggering app.listen() or scheduling
-// background cron jobs as a side effect of import.
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -38,6 +34,9 @@ import googleAuthRoutes from './routes/googleAuthRoutes.js';
 import { getQueueStats } from './jobs/reminderJobs.js';
 
 dotenv.config();
+
+
+process.env.TZ = process.env.TZ || 'UTC';
 
 const app = express();
 
