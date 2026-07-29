@@ -1,0 +1,10 @@
+diff a/src/routes/appointmentRoutes.js b/src/routes/appointmentRoutes.js	(rejected hunks)
+@@ -29,6 +29,8 @@ router.post('/', optionalAuth, validateAppointmentCreate, appointmentController.
+ router.post('/:id/reschedule', optionalAuth, appointmentController.rescheduleAppointment);
+ 
+ // --- Sensitive: staff/admin only from here down ---
++router.get('/queue/unclaimed', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.getUnclaimedAppointments);
++router.post('/:id/claim', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.claimAppointment);
+ router.put('/:id', authenticate, requireRole('ADMIN', 'STAFF'), validateAppointmentUpdate, appointmentController.updateAppointment);
+ router.delete('/:id', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.deleteAppointment);
+ router.post('/:id/no-show', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.markAppointmentNoShow);

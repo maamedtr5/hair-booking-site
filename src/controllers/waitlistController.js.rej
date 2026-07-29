@@ -1,0 +1,10 @@
+diff a/src/controllers/waitlistController.js b/src/controllers/waitlistController.js	(rejected hunks)
+@@ -50,7 +50,7 @@ export async function getWaitlistEntryHandler(req, res) {
+ export async function getWaitlistEntriesHandler(req, res) {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 500;
+ 
+     const waitlists = await getAllWaitlists({
+       skip,

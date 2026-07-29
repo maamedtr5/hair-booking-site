@@ -27,7 +27,7 @@ export const getReviews = async (req, res) => {
   try {
     // Parse query params, default to skip=0, take=10
     const skip = parseInt(req.query.skip) || 0;
-    const take = parseInt(req.query.take) || 10;
+    const take = parseInt(req.query.take) || 500;
 
     const reviews = await prisma.review.findMany({
       skip,

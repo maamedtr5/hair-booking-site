@@ -1,0 +1,879 @@
+diff --git a/package-lock.json b/package-lock.json
+index 58fa607..a4634cd 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -13,6 +13,7 @@
+         "@prisma/client": "^6.19.3",
+         "axios": "^1.16.0",
+         "bcrypt": "^6.0.0",
++        "compression": "^1.8.1",
+         "cors": "^2.8.6",
+         "dotenv": "^17.4.2",
+         "express": "^5.2.1",
+@@ -412,16 +413,23 @@
+       "license": "MIT"
+     },
+     "node_modules/axios": {
+-      "version": "1.16.0",
+-      "resolved": "https://registry.npmjs.org/axios/-/axios-1.16.0.tgz",
+-      "integrity": "sha512-6hp5CwvTPlN2A31g5dxnwAX0orzM7pmCRDLnZSX772mv8WDqICwFjowHuPs04Mc8deIld1+ejhtaMn5vp6b+1w==",
++      "version": "1.18.1",
++      "resolved": "https://registry.npmjs.org/axios/-/axios-1.18.1.tgz",
++      "integrity": "sha512-3nTvFlvpn9Zu/RkHUqtc7/+al4UpRW5az71ap5zccp6e8RAYEzhMTecX8Dz1wWDYrPpUoB1HAQEGEAEvUr7S9g==",
+       "license": "MIT",
+       "dependencies": {
+         "follow-redirects": "^1.16.0",
+         "form-data": "^4.0.5",
++        "https-proxy-agent": "^5.0.1",
+         "proxy-from-env": "^2.1.0"
+       }
+     },
++    "node_modules/balanced-match": {
++      "version": "1.0.2",
++      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-1.0.2.tgz",
++      "integrity": "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==",
++      "license": "MIT"
++    },
+     "node_modules/base64-js": {
+       "version": "1.5.1",
+       "resolved": "https://registry.npmjs.org/base64-js/-/base64-js-1.5.1.tgz",
+@@ -466,21 +474,34 @@
+       }
+     },
+     "node_modules/body-parser": {
+-      "version": "2.2.2",
+-      "resolved": "https://registry.npmjs.org/body-parser/-/body-parser-2.2.2.tgz",
+-      "integrity": "sha512-oP5VkATKlNwcgvxi0vM0p/D3n2C3EReYVX+DNYs5TjZFn/oQt2j+4sVJtSMr18pdRr8wjTcBl6LoV+FUwzPmNA==",
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/body-parser/-/body-parser-2.3.0.tgz",
++      "integrity": "sha512-2cGmJupaNgg+QUwVLAucDuWuoMZ6EX9iHDRswZ5lsNYEmwPaRknMPCLZz07yTzVq/83p4o/wzbDZbBrTvGGTIw==",
+       "license": "MIT",
+       "dependencies": {
+         "bytes": "^3.1.2",
+-        "content-type": "^1.0.5",
++        "content-type": "^2.0.0",
+         "debug": "^4.4.3",
+-        "http-errors": "^2.0.0",
+-        "iconv-lite": "^0.7.0",
++        "http-errors": "^2.0.1",
++        "iconv-lite": "^0.7.2",
+         "on-finished": "^2.4.1",
+-        "qs": "^6.14.1",
+-        "raw-body": "^3.0.1",
+-        "type-is": "^2.0.1"
++        "qs": "^6.15.2",
++        "raw-body": "^3.0.2",
++        "type-is": "^2.1.0"
++      },
++      "engines": {
++        "node": ">=18"
+       },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/body-parser/node_modules/content-type": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/content-type/-/content-type-2.0.0.tgz",
++      "integrity": "sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==",
++      "license": "MIT",
+       "engines": {
+         "node": ">=18"
+       },
+@@ -489,6 +510,16 @@
+         "url": "https://opencollective.com/express"
+       }
+     },
++    "node_modules/brace-expansion": {
++      "version": "1.1.16",
++      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.16.tgz",
++      "integrity": "sha512-IDw48K2/2kRkg9LdJxurvq3lV3aBgq0REY89duEqFRthjlPdXHKMj7EnQOXVckxzgisinf3nHfrcE2FufFLXMw==",
++      "license": "MIT",
++      "dependencies": {
++        "balanced-match": "^1.0.0",
++        "concat-map": "0.0.1"
++      }
++    },
+     "node_modules/buffer-equal-constant-time": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/buffer-equal-constant-time/-/buffer-equal-constant-time-1.0.1.tgz",
+@@ -609,6 +640,60 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/compressible": {
++      "version": "2.0.18",
++      "resolved": "https://registry.npmjs.org/compressible/-/compressible-2.0.18.tgz",
++      "integrity": "sha512-AF3r7P5dWxL8MxyITRMlORQNaOA2IkAFaTr4k7BUumjPtRpGDTZpl0Pb1XCO6JeDCBdp126Cgs9sMxqSjgYyRg==",
++      "license": "MIT",
++      "dependencies": {
++        "mime-db": ">= 1.43.0 < 2"
++      },
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
++    "node_modules/compression": {
++      "version": "1.8.1",
++      "resolved": "https://registry.npmjs.org/compression/-/compression-1.8.1.tgz",
++      "integrity": "sha512-9mAqGPHLakhCLeNyxPkK4xVo746zQ/czLH1Ky+vkitMnWfWZps8r0qXuwhwizagCRttsL4lfG4pIOvaWLpAP0w==",
++      "license": "MIT",
++      "dependencies": {
++        "bytes": "3.1.2",
++        "compressible": "~2.0.18",
++        "debug": "2.6.9",
++        "negotiator": "~0.6.4",
++        "on-headers": "~1.1.0",
++        "safe-buffer": "5.2.1",
++        "vary": "~1.1.2"
++      },
++      "engines": {
++        "node": ">= 0.8.0"
++      }
++    },
++    "node_modules/compression/node_modules/debug": {
++      "version": "2.6.9",
++      "resolved": "https://registry.npmjs.org/debug/-/debug-2.6.9.tgz",
++      "integrity": "sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==",
++      "license": "MIT",
++      "dependencies": {
++        "ms": "2.0.0"
++      }
++    },
++    "node_modules/compression/node_modules/ms": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
++      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A==",
++      "license": "MIT"
++    },
++    "node_modules/compression/node_modules/negotiator": {
++      "version": "0.6.4",
++      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.4.tgz",
++      "integrity": "sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.6"
++      }
++    },
+     "node_modules/concat-map": {
+       "version": "0.0.1",
+       "resolved": "https://registry.npmjs.org/concat-map/-/concat-map-0.0.1.tgz",
+@@ -1267,22 +1352,6 @@
+         "url": "https://github.com/sponsors/isaacs"
+       }
+     },
+-    "node_modules/glob/node_modules/balanced-match": {
+-      "version": "1.0.2",
+-      "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-1.0.2.tgz",
+-      "integrity": "sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==",
+-      "license": "MIT"
+-    },
+-    "node_modules/glob/node_modules/brace-expansion": {
+-      "version": "1.1.14",
+-      "resolved": "https://registry.npmjs.org/brace-expansion/-/brace-expansion-1.1.14.tgz",
+-      "integrity": "sha512-MWPGfDxnyzKU7rNOW9SP/c50vi3xrmrua/+6hfPbCS2ABNWfx24vPidzvC7krjU/RTo235sV776ymlsMtGKj8g==",
+-      "license": "MIT",
+-      "dependencies": {
+-        "balanced-match": "^1.0.0",
+-        "concat-map": "0.0.1"
+-      }
+-    },
+     "node_modules/glob/node_modules/minimatch": {
+       "version": "3.1.5",
+       "resolved": "https://registry.npmjs.org/minimatch/-/minimatch-3.1.5.tgz",
+@@ -1900,6 +1969,15 @@
+         "node": ">= 0.8"
+       }
+     },
++    "node_modules/on-headers": {
++      "version": "1.1.0",
++      "resolved": "https://registry.npmjs.org/on-headers/-/on-headers-1.1.0.tgz",
++      "integrity": "sha512-737ZY3yNnXy37FHkQxPzt4UZ2UWPWiCZWLvFZ4fu5cueciegX0zGPnrlY6bwRg4FdQOe9YU8MkmJwGhoMybl8A==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 0.8"
++      }
++    },
+     "node_modules/once": {
+       "version": "1.4.0",
+       "resolved": "https://registry.npmjs.org/once/-/once-1.4.0.tgz",
+@@ -2527,17 +2605,34 @@
+       }
+     },
+     "node_modules/type-is": {
+-      "version": "2.0.1",
+-      "resolved": "https://registry.npmjs.org/type-is/-/type-is-2.0.1.tgz",
+-      "integrity": "sha512-OZs6gsjF4vMp32qrCbiVSkrFmXtG/AZhY3t0iAMrMBiAZyV9oALtXO8hsrHbMXF9x6L3grlFuwW2oAz7cav+Gw==",
++      "version": "2.1.0",
++      "resolved": "https://registry.npmjs.org/type-is/-/type-is-2.1.0.tgz",
++      "integrity": "sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA==",
+       "license": "MIT",
+       "dependencies": {
+-        "content-type": "^1.0.5",
++        "content-type": "^2.0.0",
+         "media-typer": "^1.1.0",
+         "mime-types": "^3.0.0"
+       },
+       "engines": {
+-        "node": ">= 0.6"
++        "node": ">= 18"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
++      }
++    },
++    "node_modules/type-is/node_modules/content-type": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/content-type/-/content-type-2.0.0.tgz",
++      "integrity": "sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=18"
++      },
++      "funding": {
++        "type": "opencollective",
++        "url": "https://opencollective.com/express"
+       }
+     },
+     "node_modules/undici-types": {
+diff --git a/package.json b/package.json
+index c402b58..da6e52d 100644
+--- a/package.json
++++ b/package.json
+@@ -8,7 +8,7 @@
+     "dev": "nodemon src/Server.js",
+     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+     "seed": "node prisma/seed.js",
+-     "prisma:migrate": "prisma migrate dev --name init",
++    "prisma:migrate": "prisma migrate dev --name init",
+     "prisma:generate": "prisma generate",
+     "prisma:studio": "prisma studio"
+   },
+@@ -21,6 +21,7 @@
+     "@prisma/client": "^6.19.3",
+     "axios": "^1.16.0",
+     "bcrypt": "^6.0.0",
++    "compression": "^1.8.1",
+     "cors": "^2.8.6",
+     "dotenv": "^17.4.2",
+     "express": "^5.2.1",
+diff --git a/src/app.js b/src/app.js
+index bb13066..0d7892f 100644
+--- a/src/app.js
++++ b/src/app.js
+@@ -3,11 +3,15 @@
+ import express from "express";
+ import cors from "cors";
+ import helmet from "helmet";
++import compression from "compression";
+ import rateLimit from "express-rate-limit";
+ import dotenv from "dotenv";
+ import path from 'path';
+ import swaggerUi from 'swagger-ui-express';
+ import YAML from 'yamljs';
++import jwt from 'jsonwebtoken';
++import { authenticate } from './auth/authMiddleware.js';
++import { requireRole } from './middleware/roleMiddleware.js';
+ 
+ import adminRoutes from "./routes/adminRoutes.js";
+ import staffRoutes from "./routes/staffRoutes.js";
+@@ -40,6 +44,16 @@ process.env.TZ = process.env.TZ || 'UTC';
+ 
+ const app = express();
+ 
++// Behind a reverse proxy (Render/Railway/Heroku/Nginx, etc.) Express sees
++// the proxy's socket address as req.ip unless told to trust the
++// X-Forwarded-For header. Without this, every request in production would
++// resolve to the SAME ip in express-rate-limit's default keyGenerator,
++// meaning all users — admin, staff, and every client — would share one
++// rate-limit bucket and lock each other out. `1` trusts exactly one hop
++// (the platform's own edge proxy), which is correct for a single-proxy
++// deployment; adjust if a different topology is used in production.
++app.set('trust proxy', 1);
++
+ let swaggerDocument;
+ try {
+   swaggerDocument = YAML.load(path.join(process.cwd(), 'docs', 'swagger.yaml'));
+@@ -48,6 +62,7 @@ try {
+ }
+ 
+ app.use(helmet());
++app.use(compression());
+ 
+ // Only the frontend origin(s) may call this API with credentials.
+ // Set FRONTEND_URL in .env (comma-separated for multiple, e.g. staging).
+@@ -68,14 +83,44 @@ app.use(express.json({
+ }));
+ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+ 
++// Best-effort: pull a verified user id out of the Authorization header so
++// the rate limiter can bucket by *person* instead of by *device/network*.
++// Two different logged-in users (e.g. admin then staff testing on the same
++// computer, or a whole salon behind one office IP) must never share a
++// budget. Falls back to req.ip for guests/invalid tokens — never throws.
++function rateLimitKey(req) {
++  const authHeader = req.headers.authorization;
++  const token = authHeader?.split(' ')[1];
++  if (token) {
++    try {
++      const decoded = jwt.verify(token, process.env.JWT_SECRET);
++      if (decoded?.id) return `user:${decoded.id}`;
++    } catch {
++      // invalid/expired — fall through to IP-based bucketing
++    }
++  }
++  return req.ip;
++}
++
+ // General API rate limit as a floor for everything else. Auth's own
+ // login/register limiter (stricter, brute-force-focused) lives in
+ // authRoutes.js so it doesn't also throttle logout.
++//
++// windowMs is intentionally short (1 minute, not 15) with a generous cap:
++// this is meant to stop abuse/DoS, not to throttle a normal session that
++// polls notifications every 30s alongside a dashboard with a few widgets.
++// A 15-minute window at the old 300-request ceiling meant one active
++// admin dashboard could exhaust the whole bucket well before the window
++// reset, and — because the bucket was keyed by IP alone with no trust
++// proxy configured — every other role on the same network inherited the
++// lockout too.
+ const apiLimiter = rateLimit({
+-  windowMs: 15 * 60 * 1000,
++  windowMs: 60 * 1000,
+   limit: 300,
+   standardHeaders: true,
+   legacyHeaders: false,
++  keyGenerator: rateLimitKey,
++  message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
+ });
+ app.use(apiLimiter);
+ 
+@@ -141,7 +186,7 @@ app.use('/webhooks', webhookRoutes);
+ app.use('/consent', consentRoutes);
+ app.use('/intake', intakeRoutes);
+ 
+-app.get('/jobs/stats', async (req, res) => {
++app.get('/jobs/stats', authenticate, requireRole('ADMIN'), async (req, res) => {
+   try {
+     const stats = await getQueueStats();
+     res.json({ success: true, data: stats });
+diff --git a/src/controllers/adminController.js b/src/controllers/adminController.js
+index 0749e0c..23a8f59 100644
+--- a/src/controllers/adminController.js
++++ b/src/controllers/adminController.js
+@@ -30,7 +30,7 @@ export const getAdminHandler = async (req, res) => {
+ export const getAdminsHandler = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const admins = await prisma.admin.findMany({
+       skip,
+diff --git a/src/controllers/appointmentController.js b/src/controllers/appointmentController.js
+index 094e5cc..4c449ae 100644
+--- a/src/controllers/appointmentController.js
++++ b/src/controllers/appointmentController.js
+@@ -61,6 +61,20 @@ async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointment
+   }
+ }
+ 
++// Whether a specific staff member has no overlapping appointment during
++// [start, end). claimAppointment uses this, inside a Serializable
++// transaction, to make sure the staff member claiming a queued
++// appointment is actually free at that time — someone's personal
++// schedule can easily have moved since the appointment was booked.
++async function isStaffFreeAt(tx, { staffId, start, end, excludeAppointmentId }) {
++  try {
++    await assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId });
++    return true;
++  } catch {
++    return false;
++  }
++}
++
+ // Runs `work(tx)` inside a Serializable transaction, retrying once if
+ // Postgres reports a serialization conflict (Prisma error code P2034 —
+ // two concurrent transactions both tried to book the same slot). One
+@@ -68,11 +82,27 @@ async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointment
+ // the now-committed winner and correctly fails with a 409 instead of
+ // silently double-booking.
+ async function withConflictCheck(work) {
+-  for (let attempt = 0; attempt < 2; attempt++) {
++  const MAX_ATTEMPTS = 3;
++  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+     try {
+       return await prisma.$transaction(work, { isolationLevel: 'Serializable' });
+     } catch (err) {
+-      if (err.code === 'P2034' && attempt === 0) continue; // retry once
++      if (err.code === 'P2034' && attempt < MAX_ATTEMPTS - 1) {
++        // Small backoff so the winning transaction has time to actually
++        // commit before we re-check — retrying instantly back-to-back
++        // under real concurrent load just repeats the same race.
++        await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
++        continue;
++      }
++      if (err.code === 'P2034') {
++        // Retries exhausted under genuine concurrent load. This is a
++        // "please try again", not a validation failure — surfacing it as
++        // a bare 400 (the generic fallback below) reads as if the
++        // request itself was malformed, which it wasn't.
++        const retryErr = new Error('This slot is being booked by someone else right now. Please try again.');
++        retryErr.status = 409;
++        throw retryErr;
++      }
+       throw err;
+     }
+   }
+@@ -216,7 +246,13 @@ export const getAppointment = async (req, res) => {
+ export const getAppointments = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    // NOTE: previously defaulted to take=10 with no pagination UI on the
++    // admin/staff side to ever request more — the appointments list was
++    // silently truncated to the 10 earliest-dated appointments for every
++    // salon with more than 10 appointments total. Default to a high cap
++    // instead; an explicit ?take= still works for anyone who wants real
++    // pagination later.
++    const take = parseInt(req.query.take, 10) || 2000;
+     const appointments = await prisma.appointment.findMany({
+       skip,
+       take,
+@@ -234,11 +270,33 @@ export const updateAppointment = async (req, res) => {
+   try {
+     const id = parseInt(req.params.id, 10);
+ 
++    // Whitelist exactly what this endpoint is allowed to touch. `data:
++    // req.body` previously spread the raw request body straight into
++    // Prisma — harmless with today's frontend callers, but a real
++    // mass-assignment risk the moment any caller sends a wider payload
++    // (e.g. a stray clientId, id, or createdAt tagging along on an
++    // object built from the full row).
++    const ALLOWED_FIELDS = ['serviceId', 'staffId', 'date', 'status', 'notes'];
++    const updateData = {};
++    for (const field of ALLOWED_FIELDS) {
++      if (req.body[field] !== undefined) updateData[field] = req.body[field];
++    }
++    // Internal callers (Google Calendar sync, reminder jobs) are allowed
++    // to also touch these; validateAppointmentUpdate already rejects them
++    // for anyone else.
++    if (req.isInternalUpdate) {
++      for (const field of ['googleEventId', 'reminderScheduled', 'reminderSent', 'reminderSentAt']) {
++        if (req.body[field] !== undefined) updateData[field] = req.body[field];
++      }
++    }
++
++    const previous = await prisma.appointment.findUnique({ where: { id } });
++
+     const updated = await withConflictCheck(async (tx) => {
+       // Only re-check availability if this update actually touches the
+       // time or the assigned staff member — a status/notes-only edit
+       // shouldn't pay the conflict-check cost or risk a false 409.
+-      if (req.body.date || req.body.staffId !== undefined) {
++      if (updateData.date || updateData.staffId !== undefined) {
+         const existing = await tx.appointment.findUnique({
+           where: { id },
+           include: { service: true },
+@@ -250,24 +308,174 @@ export const updateAppointment = async (req, res) => {
+         }
+ 
+         const staffId =
+-          req.body.staffId !== undefined
+-            ? req.body.staffId
+-              ? parseInt(req.body.staffId, 10)
++          updateData.staffId !== undefined
++            ? updateData.staffId
++              ? parseInt(updateData.staffId, 10)
+               : null
+             : existing.staffId;
+-        const start = req.body.date ? new Date(req.body.date) : existing.date;
++        const start = updateData.date ? new Date(updateData.date) : existing.date;
+         const end = new Date(start.getTime() + existing.service.duration * 60000);
+ 
+         await assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId: id });
+       }
+ 
++      // Confirming a "no preference" booking no longer force-assigns a
++      // stylist — see claimAppointment below. It's left unassigned here;
++      // the notification fan-out after the transaction is what puts it
++      // in front of staff as something claimable.
++
++      return tx.appointment.update({
++        where: { id },
++        data: updateData,
++        include: FULL_INCLUDE,
++      });
++    });
++
++    // Fire a client-facing notification whenever the status actually
++    // changed — this is what feeds the notification bell. Best-effort:
++    // a notification failure should never fail the underlying status
++    // update, which is why this is fire-and-forget with its own catch.
++    const clientUserId = updated.booking?.client?.userId;
++    if (updateData.status && updateData.status !== previous?.status && clientUserId) {
++      const STATUS_MESSAGES = {
++        CONFIRMED: 'Your appointment has been confirmed.',
++        COMPLETED: 'Your appointment is marked complete. Thank you for choosing Locs Allure!',
++        CANCELLED: 'Your appointment has been cancelled.',
++      };
++      const message = STATUS_MESSAGES[updateData.status];
++      if (message) {
++        prisma.notification.create({
++          data: {
++            userId: clientUserId,
++            message,
++            type: 'APPOINTMENT',
++          },
++        }).catch((err) => console.error('Notification create failed:', err));
++      }
++    }
++
++    // A confirmed, still-unassigned appointment just became claimable —
++    // let every staff member know rather than relying on them to check
++    // the queue page. Best-effort/fire-and-forget for the same reason
++    // as above: a notification hiccup must never fail the confirmation.
++    if (updateData.status === 'CONFIRMED' && previous && previous.staffId == null && updated.staffId == null) {
++      prisma.staff.findMany({ select: { userId: true } })
++        .then((staffRows) => {
++          if (staffRows.length === 0) return;
++          const when = updated.date.toLocaleString('en-GH', {
++            weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
++          });
++          return prisma.notification.createMany({
++            data: staffRows.map((s) => ({
++              userId: s.userId,
++              message: `New appointment available to claim: ${updated.service?.name ?? 'a service'} on ${when}.`,
++              type: 'APPOINTMENT',
++            })),
++          });
++        })
++        .catch((err) => console.error('Queue notification fan-out failed:', err));
++    }
++
++    return sendSuccess(res, updated);
++  } catch (err) {
++    return sendError(res, err.message, err.status || 400);
++  }
++};
++
++// Staff/admin only. The "available to claim" queue: confirmed
++// appointments with no staff preference/assignment yet, upcoming only
++// (a queued appointment in the past is just a data artifact, not
++// something anyone should be claiming). Any staff member can see the
++// whole queue — claimAppointment is what actually gates who can take
++// one, based on whether it fits their own schedule.
++export const getUnclaimedAppointments = async (req, res) => {
++  try {
++    const appointments = await prisma.appointment.findMany({
++      where: {
++        status: 'CONFIRMED',
++        staffId: null,
++        date: { gte: new Date() },
++      },
++      include: FULL_INCLUDE,
++      orderBy: { date: 'asc' },
++    });
++    return sendSuccess(res, appointments);
++  } catch (err) {
++    return sendError(res, err.message, 400);
++  }
++};
++
++// Staff self-service pickup — "the moment someone's free, they can take
++// it up if they feel up to it on their schedule" instead of the system
++// (or an admin) assigning it for them. Runs inside the same Serializable
++// transaction machinery as everything else that touches a slot, so two
++// staff members claiming the same appointment at the same instant can't
++// both win — the loser gets a clean "someone already claimed this"
++// instead of silently overwriting the winner's assignment.
++export const claimAppointment = async (req, res) => {
++  try {
++    const id = parseInt(req.params.id, 10);
++
++    const staffRecord = await prisma.staff.findUnique({ where: { userId: req.user.id } });
++    if (!staffRecord) {
++      return sendError(res, 'Only staff members can claim appointments.', 403);
++    }
++
++    const updated = await withConflictCheck(async (tx) => {
++      // Re-read inside the transaction — this is the check that actually
++      // prevents a double-claim race, not the one in the queue list.
++      const existing = await tx.appointment.findUnique({
++        where: { id },
++        include: { service: true },
++      });
++      if (!existing) {
++        const err = new Error('Appointment not found');
++        err.status = 404;
++        throw err;
++      }
++      if (existing.status !== 'CONFIRMED') {
++        const err = new Error('Only confirmed appointments can be claimed.');
++        err.status = 400;
++        throw err;
++      }
++      if (existing.staffId != null) {
++        const err = new Error('Someone else already claimed this appointment.');
++        err.status = 409;
++        throw err;
++      }
++
++      const end = new Date(existing.date.getTime() + existing.service.duration * 60000);
++      const free = await isStaffFreeAt(tx, {
++        staffId: staffRecord.id,
++        start: existing.date,
++        end,
++        excludeAppointmentId: id,
++      });
++      if (!free) {
++        const err = new Error("You already have an appointment that overlaps this time.");
++        err.status = 409;
++        throw err;
++      }
++
+       return tx.appointment.update({
+         where: { id },
+-        data: req.body,
++        data: { staffId: staffRecord.id },
+         include: FULL_INCLUDE,
+       });
+     });
+ 
++    // Let the client know a stylist is now on their appointment.
++    const clientUserId = updated.booking?.client?.userId;
++    if (clientUserId) {
++      prisma.notification.create({
++        data: {
++          userId: clientUserId,
++          message: `${updated.staff?.user?.name ?? 'A stylist'} has been assigned to your appointment.`,
++          type: 'APPOINTMENT',
++        },
++      }).catch((err) => console.error('Notification create failed:', err));
++    }
++
+     return sendSuccess(res, updated);
+   } catch (err) {
+     return sendError(res, err.message, err.status || 400);
+@@ -288,6 +496,7 @@ export const updateAppointment = async (req, res) => {
+ export const deleteAppointment = async (req, res) => {
+   try {
+     const id = parseInt(req.params.id, 10);
++
+     const result = await prisma.$transaction(async (tx) => {
+       const appointment = await tx.appointment.update({
+         where: { id },
+diff --git a/src/controllers/bookingController.js b/src/controllers/bookingController.js
+index 79621a2..0c179c2 100644
+--- a/src/controllers/bookingController.js
++++ b/src/controllers/bookingController.js
+@@ -57,7 +57,7 @@ export const getBooking = async (req, res) => {
+ export const getBookings = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 1000;
+     const bookings = await prisma.booking.findMany({
+       skip,
+       take,
+diff --git a/src/controllers/clientController.js b/src/controllers/clientController.js
+index 1f219ff..724c5b5 100644
+--- a/src/controllers/clientController.js
++++ b/src/controllers/clientController.js
+@@ -24,7 +24,7 @@ export const getClient = async (req, res) => {
+ export const getClients = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 1000;
+     const clients = await prisma.client.findMany({
+       skip,
+       take,
+diff --git a/src/controllers/formController.js b/src/controllers/formController.js
+index 694ff2b..9337424 100644
+--- a/src/controllers/formController.js
++++ b/src/controllers/formController.js
+@@ -28,7 +28,7 @@ export const getForms = async (req, res) => {
+   try {
+     // Parse query params, default to skip=0, take=10
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const forms = await prisma.form.findMany({
+       skip,
+diff --git a/src/controllers/notificationController.js b/src/controllers/notificationController.js
+index 9a07768..8cee058 100644
+--- a/src/controllers/notificationController.js
++++ b/src/controllers/notificationController.js
+@@ -23,7 +23,7 @@ export const getNotificationsHandler = async (req, res) => {
+       return sendError(res, 'Forbidden', 403);
+     }
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 200;
+     const notifications = await prisma.notification.findMany({
+       where: { userId },
+       orderBy: { createdAt: 'desc' },
+@@ -74,7 +74,7 @@ export const getAllNotificationsHandler = async (req, res) => {
+   try {
+     if (!isStaffOrAdmin(req.user.role)) return sendError(res, 'Forbidden', 403);
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 200;
+     const notifications = await prisma.notification.findMany({
+       orderBy: { createdAt: 'desc' },
+       skip,
+diff --git a/src/controllers/paymentController.js b/src/controllers/paymentController.js
+index 2c706c8..167730a 100644
+--- a/src/controllers/paymentController.js
++++ b/src/controllers/paymentController.js
+@@ -225,7 +225,7 @@ export const markPaymentRefunded = async (req, res) => {
+ export const getPayments = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 1000;
+     const { status } = req.query;
+ 
+     const payments = await prisma.payment.findMany({
+diff --git a/src/controllers/promocodeController.js b/src/controllers/promocodeController.js
+index 81ecb96..885fb97 100644
+--- a/src/controllers/promocodeController.js
++++ b/src/controllers/promocodeController.js
+@@ -35,14 +35,15 @@ export const getPromocodeByCode = async (req, res) => {
+ //   Get all promo codes (with skip/take pagination)
+ export const getPromocodes = async (req, res) => {
+   try {
+-    // Parse query params, default to skip=0, take=10
++    // Parse query params; default to a high cap since the admin promo
++    // codes page has no pagination UI and expects the full list.
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const promocodes = await prisma.promocode.findMany({
+       skip,
+       take,
+-      orderBy: { createdAt: 'desc' }, // optional: newest first
++      orderBy: { id: 'desc' }, // newest first — Promocode has no createdAt column
+     });
+ 
+     return sendSuccess(res, promocodes);
+diff --git a/src/controllers/reviewController.js b/src/controllers/reviewController.js
+index 7a5b196..6d9d08b 100644
+--- a/src/controllers/reviewController.js
++++ b/src/controllers/reviewController.js
+@@ -27,7 +27,7 @@ export const getReviews = async (req, res) => {
+   try {
+     // Parse query params, default to skip=0, take=10
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const reviews = await prisma.review.findMany({
+       skip,
+diff --git a/src/controllers/serviceController.js b/src/controllers/serviceController.js
+index f53d00a..ed00307 100644
+--- a/src/controllers/serviceController.js
++++ b/src/controllers/serviceController.js
+@@ -35,7 +35,7 @@ export const getService = async (req, res) => {
+ export const getServices = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const services = await prisma.service.findMany({
+       skip,
+diff --git a/src/controllers/slotController.js b/src/controllers/slotController.js
+index 325d074..af5cba4 100644
+--- a/src/controllers/slotController.js
++++ b/src/controllers/slotController.js
+@@ -41,7 +41,7 @@ export const getSlots = async (req, res) => {
+   try {
+     // Parse query params, default to skip=0, take=10
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const slots = await prisma.slot.findMany({
+       skip,
+diff --git a/src/controllers/staffController.js b/src/controllers/staffController.js
+index 4476f7b..75f5ec1 100644
+--- a/src/controllers/staffController.js
++++ b/src/controllers/staffController.js
+@@ -38,7 +38,7 @@ export const getStaffHandler = async (req, res) => {
+ export const getStaffsHandler = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const staff = await prisma.staff.findMany({
+       skip,
+diff --git a/src/controllers/userController.js b/src/controllers/userController.js
+index 08605e3..6938adf 100644
+--- a/src/controllers/userController.js
++++ b/src/controllers/userController.js
+@@ -45,7 +45,7 @@ export async function getUserHandler(req, res) {
+ export async function getUsersHandler(req, res) {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 1000;
+     const users = await prisma.user.findMany({ skip, take });
+     return sendSuccess(res, users.map(stripPassword));
+   } catch (err) {
+diff --git a/src/controllers/waitlistController.js b/src/controllers/waitlistController.js
+index 7c508a2..a4eb315 100644
+--- a/src/controllers/waitlistController.js
++++ b/src/controllers/waitlistController.js
+@@ -50,7 +50,7 @@ export async function getWaitlistEntryHandler(req, res) {
+ export async function getWaitlistEntriesHandler(req, res) {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 500;
+ 
+     const waitlists = await getAllWaitlists({
+       skip,
+diff --git a/src/models/Booking.js b/src/models/booking.js
+similarity index 100%
+rename from src/models/Booking.js
+rename to src/models/booking.js
+diff --git a/src/models/Client.js b/src/models/client.js
+similarity index 100%
+rename from src/models/Client.js
+rename to src/models/client.js
+diff --git a/src/models/Form.js b/src/models/form.js
+similarity index 100%
+rename from src/models/Form.js
+rename to src/models/form.js
+diff --git a/src/models/PromoCode.js b/src/models/promocode.js
+similarity index 100%
+rename from src/models/PromoCode.js
+rename to src/models/promocode.js
+diff --git a/src/models/Review.js b/src/models/review.js
+similarity index 100%
+rename from src/models/Review.js
+rename to src/models/review.js
+diff --git a/src/models/Settings.js b/src/models/settings.js
+similarity index 100%
+rename from src/models/Settings.js
+rename to src/models/settings.js
+diff --git a/src/routes/appointmentRoutes.js b/src/routes/appointmentRoutes.js
+index acadb81..a5035b1 100644
+--- a/src/routes/appointmentRoutes.js
++++ b/src/routes/appointmentRoutes.js
+@@ -29,6 +29,8 @@ router.post('/', optionalAuth, validateAppointmentCreate, appointmentController.
+ router.post('/:id/reschedule', optionalAuth, appointmentController.rescheduleAppointment);
+ 
+ // --- Sensitive: staff/admin only from here down ---
++router.get('/queue/unclaimed', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.getUnclaimedAppointments);
++router.post('/:id/claim', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.claimAppointment);
+ router.put('/:id', authenticate, requireRole('ADMIN', 'STAFF'), validateAppointmentUpdate, appointmentController.updateAppointment);
+ router.delete('/:id', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.deleteAppointment);
+ router.post('/:id/no-show', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.markAppointmentNoShow);

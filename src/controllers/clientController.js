@@ -24,7 +24,7 @@ export const getClient = async (req, res) => {
 export const getClients = async (req, res) => {
   try {
     const skip = parseInt(req.query.skip, 10) || 0;
-    const take = parseInt(req.query.take, 10) || 10;
+    const take = parseInt(req.query.take, 10) || 1000;
     const clients = await prisma.client.findMany({
       skip,
       take,

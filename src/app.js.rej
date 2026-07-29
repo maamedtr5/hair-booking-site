@@ -1,0 +1,97 @@
+diff a/src/app.js b/src/app.js	(rejected hunks)
+@@ -3,11 +3,15 @@
+ import express from "express";
+ import cors from "cors";
+ import helmet from "helmet";
++import compression from "compression";
+ import rateLimit from "express-rate-limit";
+ import dotenv from "dotenv";
+ import path from 'path';
+ import swaggerUi from 'swagger-ui-express';
+ import YAML from 'yamljs';
++import jwt from 'jsonwebtoken';
++import { authenticate } from './auth/authMiddleware.js';
++import { requireRole } from './middleware/roleMiddleware.js';
+ 
+ import adminRoutes from "./routes/adminRoutes.js";
+ import staffRoutes from "./routes/staffRoutes.js";
+@@ -40,6 +44,16 @@ process.env.TZ = process.env.TZ || 'UTC';
+ 
+ const app = express();
+ 
++// Behind a reverse proxy (Render/Railway/Heroku/Nginx, etc.) Express sees
++// the proxy's socket address as req.ip unless told to trust the
++// X-Forwarded-For header. Without this, every request in production would
++// resolve to the SAME ip in express-rate-limit's default keyGenerator,
++// meaning all users — admin, staff, and every client — would share one
++// rate-limit bucket and lock each other out. `1` trusts exactly one hop
++// (the platform's own edge proxy), which is correct for a single-proxy
++// deployment; adjust if a different topology is used in production.
++app.set('trust proxy', 1);
++
+ let swaggerDocument;
+ try {
+   swaggerDocument = YAML.load(path.join(process.cwd(), 'docs', 'swagger.yaml'));
+@@ -48,6 +62,7 @@ try {
+ }
+ 
+ app.use(helmet());
++app.use(compression());
+ 
+ // Only the frontend origin(s) may call this API with credentials.
+ // Set FRONTEND_URL in .env (comma-separated for multiple, e.g. staging).
+@@ -68,14 +83,44 @@ app.use(express.json({
+ }));
+ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+ 
++// Best-effort: pull a verified user id out of the Authorization header so
++// the rate limiter can bucket by *person* instead of by *device/network*.
++// Two different logged-in users (e.g. admin then staff testing on the same
++// computer, or a whole salon behind one office IP) must never share a
++// budget. Falls back to req.ip for guests/invalid tokens — never throws.
++function rateLimitKey(req) {
++  const authHeader = req.headers.authorization;
++  const token = authHeader?.split(' ')[1];
++  if (token) {
++    try {
++      const decoded = jwt.verify(token, process.env.JWT_SECRET);
++      if (decoded?.id) return `user:${decoded.id}`;
++    } catch {
++      // invalid/expired — fall through to IP-based bucketing
++    }
++  }
++  return req.ip;
++}
++
+ // General API rate limit as a floor for everything else. Auth's own
+ // login/register limiter (stricter, brute-force-focused) lives in
+ // authRoutes.js so it doesn't also throttle logout.
++//
++// windowMs is intentionally short (1 minute, not 15) with a generous cap:
++// this is meant to stop abuse/DoS, not to throttle a normal session that
++// polls notifications every 30s alongside a dashboard with a few widgets.
++// A 15-minute window at the old 300-request ceiling meant one active
++// admin dashboard could exhaust the whole bucket well before the window
++// reset, and — because the bucket was keyed by IP alone with no trust
++// proxy configured — every other role on the same network inherited the
++// lockout too.
+ const apiLimiter = rateLimit({
+-  windowMs: 15 * 60 * 1000,
++  windowMs: 60 * 1000,
+   limit: 300,
+   standardHeaders: true,
+   legacyHeaders: false,
++  keyGenerator: rateLimitKey,
++  message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
+ });
+ app.use(apiLimiter);
+ 
+@@ -141,7 +186,7 @@ app.use('/webhooks', webhookRoutes);
+ app.use('/consent', consentRoutes);
+ app.use('/intake', intakeRoutes);
+ 
+-app.get('/jobs/stats', async (req, res) => {
++app.get('/jobs/stats', authenticate, requireRole('ADMIN'), async (req, res) => {
+   try {
+     const stats = await getQueueStats();
+     res.json({ success: true, data: stats });

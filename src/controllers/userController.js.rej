@@ -1,0 +1,10 @@
+diff a/src/controllers/userController.js b/src/controllers/userController.js	(rejected hunks)
+@@ -45,7 +45,7 @@ export async function getUserHandler(req, res) {
+ export async function getUsersHandler(req, res) {
+   try {
+     const skip = parseInt(req.query.skip, 10) || 0;
+-    const take = parseInt(req.query.take, 10) || 10;
++    const take = parseInt(req.query.take, 10) || 1000;
+     const users = await prisma.user.findMany({ skip, take });
+     return sendSuccess(res, users.map(stripPassword));
+   } catch (err) {

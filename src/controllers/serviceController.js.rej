@@ -1,0 +1,10 @@
+diff a/src/controllers/serviceController.js b/src/controllers/serviceController.js	(rejected hunks)
+@@ -35,7 +35,7 @@ export const getService = async (req, res) => {
+ export const getServices = async (req, res) => {
+   try {
+     const skip = parseInt(req.query.skip) || 0;
+-    const take = parseInt(req.query.take) || 10;
++    const take = parseInt(req.query.take) || 500;
+ 
+     const services = await prisma.service.findMany({
+       skip,

@@ -30,7 +30,7 @@ export const getAdminHandler = async (req, res) => {
 export const getAdminsHandler = async (req, res) => {
   try {
     const skip = parseInt(req.query.skip) || 0;
-    const take = parseInt(req.query.take) || 10;
+    const take = parseInt(req.query.take) || 500;
 
     const admins = await prisma.admin.findMany({
       skip,

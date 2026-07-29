@@ -57,7 +57,7 @@ export const getBooking = async (req, res) => {
 export const getBookings = async (req, res) => {
   try {
     const skip = parseInt(req.query.skip, 10) || 0;
-    const take = parseInt(req.query.take, 10) || 10;
+    const take = parseInt(req.query.take, 10) || 1000;
     const bookings = await prisma.booking.findMany({
       skip,
       take,

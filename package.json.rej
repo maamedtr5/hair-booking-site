@@ -1,0 +1,18 @@
+diff a/package.json b/package.json	(rejected hunks)
+@@ -8,7 +8,7 @@
+     "dev": "nodemon src/Server.js",
+     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+     "seed": "node prisma/seed.js",
+-     "prisma:migrate": "prisma migrate dev --name init",
++    "prisma:migrate": "prisma migrate dev --name init",
+     "prisma:generate": "prisma generate",
+     "prisma:studio": "prisma studio"
+   },
+@@ -21,6 +21,7 @@
+     "@prisma/client": "^6.19.3",
+     "axios": "^1.16.0",
+     "bcrypt": "^6.0.0",
++    "compression": "^1.8.1",
+     "cors": "^2.8.6",
+     "dotenv": "^17.4.2",
+     "express": "^5.2.1",
