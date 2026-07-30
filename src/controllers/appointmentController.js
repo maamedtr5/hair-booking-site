@@ -10,7 +10,7 @@ const FULL_INCLUDE = {
   staff: { include: { user: true } },
   booking: { include: { client: { include: { user: true } }, payment: true } },
 };
- 
+
 // Appointments in these statuses no longer hold a real slot on the
 // calendar, so they never count as a conflict for a new/rescheduled booking.
 const NON_BLOCKING_STATUSES = ['CANCELLED', 'NO_SHOW'];
@@ -60,8 +60,6 @@ async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointment
     throw err;
   }
 }
-
-
 
 // Whether a specific staff member has no overlapping appointment during
 // [start, end). claimAppointment uses this, inside a Serializable
