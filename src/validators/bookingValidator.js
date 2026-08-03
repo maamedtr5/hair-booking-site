@@ -84,7 +84,26 @@ export const validateBookingUpdate = [
 
   body('promocodeId')
     .optional()
-    .isInt({ min: 1 }).withMessage('Invalid promocode ID'),
+    .isInt({ min: 1 }).withMessage('Invalid promocode ID')
+    .custom(async (promocodeId) => {
+      if (promocodeId) {
+        const promocode = await prisma.promocode.findUnique({
+          where: { id: parseInt(promocodeId) },
+        });
+        if (!promocode) {
+          throw new Error('Promocode not found');
+        }
+        if (!promocode.isActive) {
+          throw new Error('Promocode is not active');
+        }
+
+        const now = new Date();
+        if (now < promocode.validFrom || now > promocode.validUntil) {
+          throw new Error('Promocode is not valid at this time');
+        }
+      }
+      return true;
+    }),
 
   handleValidationErrors,
 ];

@@ -173,10 +173,23 @@ export const recordManualPayment = async (req, res) => {
 };
 
 //   Mark payment as SUCCESS
+// Refund states are the end of the line for a payment record — flipping
+// one back to SUCCESS/FAILED here would silently erase the refund trail.
+// A genuine correction should go through markPaymentRefunded (which
+// intentionally allows any starting state) rather than through these.
+const REFUND_LOCKED_STATUSES = ['REFUNDED', 'REFUND_PENDING'];
+
 export const markPaymentSuccess = async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    const existing = await prisma.payment.findUnique({ where: { id } });
+    if (!existing) return sendError(res, 'Payment not found', 404);
+    if (REFUND_LOCKED_STATUSES.includes(existing.status)) {
+      return sendError(res, `Cannot mark a ${existing.status} payment as SUCCESS`, 409);
+    }
+
     const payment = await prisma.payment.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       data: { status: 'SUCCESS' }
     });
 
@@ -190,8 +203,15 @@ export const markPaymentSuccess = async (req, res) => {
 //   Mark payment as FAILED
 export const markPaymentFailed = async (req, res) => {
   try {
+    const id = parseInt(req.params.id);
+    const existing = await prisma.payment.findUnique({ where: { id } });
+    if (!existing) return sendError(res, 'Payment not found', 404);
+    if (REFUND_LOCKED_STATUSES.includes(existing.status)) {
+      return sendError(res, `Cannot mark a ${existing.status} payment as FAILED`, 409);
+    }
+
     const payment = await prisma.payment.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       data: { status: 'FAILED' }
     });
 

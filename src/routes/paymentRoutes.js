@@ -9,7 +9,8 @@ import {
   recordManualPayment,
   getPaymentQuote,
 } from '../controllers/paymentController.js';
-import { authenticate, authorizeRoles } from '../auth/authMiddleware.js';
+import { authenticate } from '../auth/authMiddleware.js';
+import { requireRole } from '../middleware/roleMiddleware.js';
 import { optionalAuth } from '../middleware/optionalAuth.js';
 import { validatePaymentCreate } from '../validators/paymentValidator.js';
 
@@ -37,7 +38,7 @@ router.post(
 router.post(
   '/manual',
   authenticate,
-  authorizeRoles('ADMIN', 'STAFF'),
+  requireRole('ADMIN', 'STAFF'),
   recordManualPayment
 );
 
@@ -45,14 +46,14 @@ router.post(
 router.put(
   '/:id/success',
   authenticate,
-  authorizeRoles('ADMIN', 'STAFF'),
+  requireRole('ADMIN', 'STAFF'),
   markPaymentSuccess
 );
 
 router.put(
   '/:id/failed',
   authenticate,
-  authorizeRoles('ADMIN', 'STAFF'),
+  requireRole('ADMIN', 'STAFF'),
   markPaymentFailed
 );
 
@@ -62,7 +63,7 @@ router.put(
 router.put(
   '/:id/refunded',
   authenticate,
-  authorizeRoles('ADMIN', 'STAFF'),
+  requireRole('ADMIN', 'STAFF'),
   markPaymentRefunded
 );
 
@@ -71,7 +72,7 @@ router.put(
 router.get(
   '/',
   authenticate,
-  authorizeRoles('ADMIN', 'STAFF'),
+  requireRole('ADMIN', 'STAFF'),
   getPayments
 );
 

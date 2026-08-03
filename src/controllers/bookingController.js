@@ -18,9 +18,20 @@ function sanitizeBooking(booking) {
 }
 
 // Staff/admin only (route-level) — manual booking for an existing appointment.
+// Only these are validated by validateBookingCreate — anything else in
+// the body must not reach Prisma. `data: req.body` previously spread the
+// raw payload straight into `booking.create`, which was harmless with
+// today's frontend caller but a real mass-assignment risk the moment any
+// other field (e.g. a stray id/createdAt) tags along on the object.
+const CREATE_ALLOWED_FIELDS = ['appointmentId', 'clientId', 'userId', 'promocodeId', 'status'];
+
 export const createBooking = async (req, res) => {
   try {
-    const booking = await bookingModel.createBooking(req.body);
+    const data = {};
+    for (const field of CREATE_ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field];
+    }
+    const booking = await bookingModel.createBooking(data);
     return sendSuccess(res, sanitizeBooking(booking), 201);
   } catch (err) {
     return sendError(res, err.message, 400);
@@ -70,9 +81,15 @@ export const getBookings = async (req, res) => {
   }
 };
 
+const UPDATE_ALLOWED_FIELDS = ['status', 'promocodeId'];
+
 export const updateBooking = async (req, res) => {
   try {
-    const booking = await bookingModel.updateBooking(parseInt(req.params.id, 10), req.body);
+    const data = {};
+    for (const field of UPDATE_ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) data[field] = req.body[field];
+    }
+    const booking = await bookingModel.updateBooking(parseInt(req.params.id, 10), data);
     return sendSuccess(res, sanitizeBooking(booking));
   } catch (err) {
     return sendError(res, err.message, 400);

@@ -35,7 +35,26 @@ router.put('/:id', authenticate, requireRole('ADMIN', 'STAFF'), validateAppointm
 router.delete('/:id', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.deleteAppointment);
 router.post('/:id/no-show', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.markAppointmentNoShow);
 router.post('/bulk-cancel', authenticate, requireRole('ADMIN', 'STAFF'), validateBulkCancel, appointmentController.bulkCancelAppointments);
-router.put('/internal/:id', authenticate, requireRole('ADMIN'), validateInternalAppointmentUpdate, appointmentController.internalUpdateAppointment);
+router.put(
+  '/internal/:id',
+  authenticate,
+  requireRole('ADMIN'),
+  validateInternalAppointmentUpdate,
+  (req, res, next) => {
+    // Marks this request as coming from an internal caller so
+    // updateAppointment's whitelist also allows googleEventId/reminder
+    // fields. Delegating here (instead of the old separate
+    // internalUpdateAppointment handler) means this route gets the same
+    // field whitelist AND the same Serializable conflict check as every
+    // other appointment write path — the old handler did `data: req.body`
+    // directly and never re-checked slot availability, so an admin
+    // request touching date/staffId here could silently create a
+    // double-booking.
+    req.isInternalUpdate = true;
+    next();
+  },
+  appointmentController.updateAppointment
+);
 router.post('/:id/reminder', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.scheduleAppointmentReminder);
 router.delete('/:id/reminder', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.cancelAppointmentReminder);
 router.get('/stats/queue', authenticate, requireRole('ADMIN'), appointmentController.getQueueStats);

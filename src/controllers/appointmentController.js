@@ -376,6 +376,18 @@ export const updateAppointment = async (req, res) => {
         .catch((err) => console.error('Queue notification fan-out failed:', err));
     }
 
+    // Internal callers (Google Calendar sync, reminder jobs) moving the
+    // appointment's date need any already-scheduled reminder rebuilt
+    // against the new time. Best-effort — a reminder-scheduling hiccup
+    // must never fail the underlying update.
+    if (req.isInternalUpdate && updateData.date) {
+      const { scheduleAppointmentReminder: scheduleReminder } = await import('../jobs/reminderJobs.js');
+      await scheduleReminder(updated.id).catch((err) =>
+        console.error('Reminder reschedule failed:', err.message)
+      );
+    }
+    // TODO: Google Calendar resync — see checklist item "reminder-wiring-bug".
+
     return sendSuccess(res, updated);
   } catch (err) {
     return sendError(res, err.message, err.status || 400);
@@ -740,29 +752,6 @@ export const rescheduleAppointment = async (req, res) => {
 // calendar an admin-created event syncs to. Reminder scheduling is
 // wired to the real reminderJobs export names (the previous version
 // referenced functions that didn't exist).
-export const internalUpdateAppointment = async (req, res) => {
-  try {
-    const id = parseInt(req.params.id, 10);
-    const updated = await prisma.appointment.update({
-      where: { id },
-      data: req.body,
-      include: FULL_INCLUDE,
-    });
-
-    if (req.body.date) {
-      const { scheduleAppointmentReminder: scheduleReminder } = await import('../jobs/reminderJobs.js');
-      await scheduleReminder(updated.id).catch((err) =>
-        console.error('Reminder reschedule failed:', err.message)
-      );
-    }
-    // TODO: Google Calendar resync — see checklist item "reminder-wiring-bug".
-
-    return sendSuccess(res, updated);
-  } catch (err) {
-    return sendError(res, err.message, 400);
-  }
-};
-
 export const scheduleAppointmentReminder = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
