@@ -12,8 +12,16 @@ const initializeTwilio = () => {
   }
 };
 
-// Format appointment reminder SMS
+// Format appointment reminder SMS. `data.waitlisted` / `data.waitlistPromoted`
+// let callers reuse this for the waitlist flow without mislabeling a same-day
+// confirmation or a "you're off the waitlist" message as a day-before reminder.
 export const formatReminderSMS = (data) => {
+  if (data.waitlisted) {
+    return `Hi ${data.clientName}! Every stylist is booked for your requested ${data.serviceName} time. You're on the waitlist — we'll text you the moment a slot opens up. - Locs Allure`;
+  }
+  if (data.waitlistPromoted) {
+    return `Hi ${data.clientName}! Good news — a slot opened up. Your ${data.serviceName} appointment is now confirmed for ${data.appointmentTime}. - Locs Allure`;
+  }
   return `Hi ${data.clientName}! Reminder: Your ${data.serviceName} appointment with ${data.staffName} is tomorrow at ${data.appointmentTime}. Location: ${process.env.BUSINESS_ADDRESS || 'Our salon'}. See you soon! 💇 - Hair Booking`;
 };
 

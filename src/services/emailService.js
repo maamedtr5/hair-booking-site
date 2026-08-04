@@ -69,6 +69,88 @@ Hair Booking Team
     `,
   }),
 
+  appointmentWaitlisted: (data) => ({
+    subject: `You're on the waitlist - ${data.serviceName}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: #b08d57; color: white; padding: 30px; text-align: center; }
+            .content { padding: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>You're on the Waitlist</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.clientName},</p>
+              <p>Every stylist is already booked for your requested ${data.serviceName} time (${data.appointmentTime}), so we've added you to the waitlist for that slot.</p>
+              <p>We'll email and text you the moment a stylist becomes free for that time — no action needed from you right now.</p>
+              <p>Thank you for your patience,<br>Locs Allure</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `
+Hi ${data.clientName},
+
+Every stylist is already booked for your requested ${data.serviceName} time (${data.appointmentTime}), so we've added you to the waitlist for that slot.
+
+We'll email and text you the moment a stylist becomes free for that time — no action needed from you right now.
+
+Thank you for your patience,
+Locs Allure
+    `,
+  }),
+
+  appointmentWaitlistPromoted: (data) => ({
+    subject: `A slot opened up - ${data.serviceName} confirmed`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; background: white; }
+            .header { background: #2e7d32; color: white; padding: 30px; text-align: center; }
+            .content { padding: 30px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>Good News — You're Off the Waitlist!</h1>
+            </div>
+            <div class="content">
+              <p>Hi ${data.clientName},</p>
+              <p>A slot just opened up and your ${data.serviceName} appointment for ${data.appointmentTime} is now booked.</p>
+              <p>We look forward to seeing you then!</p>
+              <p>Best regards,<br>Locs Allure</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `
+Hi ${data.clientName},
+
+A slot just opened up and your ${data.serviceName} appointment for ${data.appointmentTime} is now booked.
+
+We look forward to seeing you then!
+
+Best regards,
+Locs Allure
+    `,
+  }),
+
   appointmentRescheduled: (data) => ({
     subject: `🔄 Appointment Rescheduled - ${data.serviceName}`,
     html: `

@@ -4,16 +4,17 @@ import { sendEmail } from '../services/emailService.js';
 import { sendAppointmentReminderSMS } from '../services/smsService.js';
 import { resolveClientForRequest } from '../services/guestClientService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import {
+  NON_BLOCKING_STATUSES,
+  hasStylistCapacity,
+  promoteWaitlistedAppointments,
+} from '../utils/capacity.js';
 
 const FULL_INCLUDE = {
   service: true,
   staff: { include: { user: true } },
   booking: { include: { client: { include: { user: true } }, payment: true } },
 };
-
-// Appointments in these statuses no longer hold a real slot on the
-// calendar, so they never count as a conflict for a new/rescheduled booking.
-const NON_BLOCKING_STATUSES = ['CANCELLED', 'NO_SHOW'];
 
 // Generous upper bound on how long any single service could ever run.
 // Used only to keep the conflict-check query from scanning the entire
@@ -134,6 +135,48 @@ async function resolvePromocodeId(tx, promoCode) {
   return promo.id;
 }
 
+// Best-effort fan-out for appointments promoteWaitlistedAppointments just
+// moved off the waitlist. Never called inside the transaction itself —
+// email/SMS/notification failures must never roll back a promotion that
+// already committed.
+function notifyPromotedClients(promoted) {
+  for (const appt of promoted) {
+    const client = appt.booking?.client;
+    if (!client) continue;
+
+    prisma.notification.create({
+      data: {
+        userId: client.userId,
+        message: `Good news — a slot opened up for your ${appt.service?.name ?? 'appointment'} and you're off the waitlist. You're now booked for ${appt.date.toLocaleString('en-GH', { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}.`,
+        type: 'APPOINTMENT',
+      },
+    }).catch((err) => console.error('Waitlist promotion notification failed:', err));
+
+    if (client.user?.email) {
+      sendEmail({
+        to: client.user.email,
+        template: 'appointmentWaitlistPromoted',
+        data: {
+          clientName: client.user.name,
+          serviceName: appt.service?.name,
+          appointmentTime: appt.date,
+          staffName: appt.staff?.user?.name,
+        },
+      }).catch((err) => console.error('Waitlist promotion email failed:', err.message));
+    }
+    if (client.phone) {
+      sendAppointmentReminderSMS({
+        clientPhone: client.phone,
+        clientName: client.user?.name,
+        serviceName: appt.service?.name,
+        appointmentTime: appt.date,
+        staffName: appt.staff?.user?.name,
+        waitlistPromoted: true,
+      }).catch((err) => console.error('Waitlist promotion SMS failed:', err.message));
+    }
+  }
+}
+
 // Book an appointment — open to guests and logged-in clients alike.
 // Creates the Appointment + Booking together so the frontend only makes
 // one call to "book now".
@@ -156,6 +199,21 @@ export const createAppointment = async (req, res) => {
       const staffIdInt = staffId ? parseInt(staffId, 10) : null;
 
       await assertSlotAvailable(tx, { staffId: staffIdInt, start, end });
+
+      // "No preference" bookings aren't checked against a specific staff
+      // member above, but they still consume a real seat once one exists.
+      // Without this, two different clients could both land a "no
+      // preference" booking for an overlapping window that only one
+      // stylist total can actually cover — only one could ever be
+      // claimed, and the other would sit on the calendar unfulfillable.
+      // If nobody is actually free, waitlist it instead of pretending
+      // it's a normal claimable booking.
+      let initialStatus; // undefined => use the schema default (PENDING)
+      if (!staffIdInt) {
+        const capacityAvailable = await hasStylistCapacity(tx, { start, end });
+        if (!capacityAvailable) initialStatus = 'WAITLISTED';
+      }
+
       const promocodeId = await resolvePromocodeId(tx, promoCode);
 
       const appointment = await tx.appointment.create({
@@ -164,6 +222,7 @@ export const createAppointment = async (req, res) => {
           staffId: staffIdInt,
           date: start,
           notes: notes ?? null,
+          ...(initialStatus ? { status: initialStatus } : {}),
         },
       });
       await tx.booking.create({
@@ -175,10 +234,12 @@ export const createAppointment = async (req, res) => {
       });
     });
 
+    const isWaitlisted = result.status === 'WAITLISTED';
+
     // Don't fail the booking if the confirmation notification fails.
     sendEmail({
       to: contactEmail,
-      template: 'appointmentConfirmation',
+      template: isWaitlisted ? 'appointmentWaitlisted' : 'appointmentConfirmation',
       data: {
         clientName: contactName,
         serviceName: result.service?.name,
@@ -194,14 +255,17 @@ export const createAppointment = async (req, res) => {
         serviceName: result.service?.name,
         appointmentTime: result.date,
         staffName: result.staff?.user?.name,
+        waitlisted: isWaitlisted,
       }).catch((err) => console.error('Confirmation SMS failed:', err.message));
     }
 
     return sendSuccess(
       res,
-      { ...result, bookingReference: result.booking?.id },
+      { ...result, bookingReference: result.booking?.id, waitlisted: isWaitlisted },
       201,
-      'Appointment booked'
+      isWaitlisted
+        ? 'Every stylist is already booked for that time — you\u2019ve been added to the waitlist and will be notified the moment a slot opens up.'
+        : 'Appointment booked'
     );
   } catch (err) {
     return sendError(res, err.message, err.status || 400);
@@ -324,18 +388,28 @@ export const updateAppointment = async (req, res) => {
       // the notification fan-out after the transaction is what puts it
       // in front of staff as something claimable.
 
-      return tx.appointment.update({
+      const updatedAppt = await tx.appointment.update({
         where: { id },
         data: updateData,
         include: FULL_INCLUDE,
       });
+
+      // Cancelling (via this generic endpoint, e.g. an admin edit) frees
+      // whatever seat this appointment held — check the waitlist.
+      const promoted =
+        updateData.status === 'CANCELLED' ? await promoteWaitlistedAppointments(tx) : [];
+
+      return { updatedAppt, promoted };
     });
+
+    const { updatedAppt, promoted } = updated;
+    notifyPromotedClients(promoted);
 
     // Fire a client-facing notification whenever the status actually
     // changed — this is what feeds the notification bell. Best-effort:
     // a notification failure should never fail the underlying status
     // update, which is why this is fire-and-forget with its own catch.
-    const clientUserId = updated.booking?.client?.userId;
+    const clientUserId = updatedAppt.booking?.client?.userId;
     if (updateData.status && updateData.status !== previous?.status && clientUserId) {
       const STATUS_MESSAGES = {
         CONFIRMED: 'Your appointment has been confirmed.',
@@ -358,17 +432,17 @@ export const updateAppointment = async (req, res) => {
     // let every staff member know rather than relying on them to check
     // the queue page. Best-effort/fire-and-forget for the same reason
     // as above: a notification hiccup must never fail the confirmation.
-    if (updateData.status === 'CONFIRMED' && previous && previous.staffId == null && updated.staffId == null) {
+    if (updateData.status === 'CONFIRMED' && previous && previous.staffId == null && updatedAppt.staffId == null) {
       prisma.staff.findMany({ select: { userId: true } })
         .then((staffRows) => {
           if (staffRows.length === 0) return;
-          const when = updated.date.toLocaleString('en-GH', {
+          const when = updatedAppt.date.toLocaleString('en-GH', {
             weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
           });
           return prisma.notification.createMany({
             data: staffRows.map((s) => ({
               userId: s.userId,
-              message: `New appointment available to claim: ${updated.service?.name ?? 'a service'} on ${when}.`,
+              message: `New appointment available to claim: ${updatedAppt.service?.name ?? 'a service'} on ${when}.`,
               type: 'APPOINTMENT',
             })),
           });
@@ -382,13 +456,13 @@ export const updateAppointment = async (req, res) => {
     // must never fail the underlying update.
     if (req.isInternalUpdate && updateData.date) {
       const { scheduleAppointmentReminder: scheduleReminder } = await import('../jobs/reminderJobs.js');
-      await scheduleReminder(updated.id).catch((err) =>
+      await scheduleReminder(updatedAppt.id).catch((err) =>
         console.error('Reminder reschedule failed:', err.message)
       );
     }
     // TODO: Google Calendar resync — see checklist item "reminder-wiring-bug".
 
-    return sendSuccess(res, updated);
+    return sendSuccess(res, updatedAppt);
   } catch (err) {
     return sendError(res, err.message, err.status || 400);
   }
@@ -509,7 +583,7 @@ export const deleteAppointment = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
 
-    const result = await prisma.$transaction(async (tx) => {
+    const { result, promoted } = await prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.update({
         where: { id },
         data: { status: 'CANCELLED' },
@@ -527,8 +601,13 @@ export const deleteAppointment = async (req, res) => {
           });
         }
       }
-      return appointment;
+      // Cancelling frees a seat — see if a waitlisted client can take it.
+      const promoted = await promoteWaitlistedAppointments(tx);
+      return { result: appointment, promoted };
     });
+
+    notifyPromotedClients(promoted);
+
     return sendSuccess(res, result, 200, 'Appointment cancelled');
   } catch (err) {
     return sendError(res, err.message, 400);
@@ -636,7 +715,7 @@ export const getAppointmentsByStatus = async (req, res) => {
 export const bulkCancelAppointments = async (req, res) => {
   try {
     const { appointmentIds } = req.body;
-    const cancelled = await prisma.$transaction(async (tx) => {
+    const { cancelled, promoted } = await prisma.$transaction(async (tx) => {
       const toCancel = await tx.appointment.findMany({
         where: { id: { in: appointmentIds } },
         include: FULL_INCLUDE,
@@ -664,8 +743,14 @@ export const bulkCancelAppointments = async (req, res) => {
         });
       }
 
-      return toCancel;
+      // Each cancellation frees a seat — a batch cancel can free several,
+      // so this may promote more than one waitlisted request.
+      const promoted = await promoteWaitlistedAppointments(tx);
+
+      return { cancelled: toCancel, promoted };
     });
+
+    notifyPromotedClients(promoted);
 
     for (const appt of cancelled) {
       const client = appt.booking?.client;
@@ -720,28 +805,38 @@ export const rescheduleAppointment = async (req, res) => {
       const end = new Date(start.getTime() + existing.service.duration * 60000);
       await assertSlotAvailable(tx, { staffId: existing.staffId, start, end, excludeAppointmentId: id });
 
-      return tx.appointment.update({
+      const updatedAppt = await tx.appointment.update({
         where: { id },
         data: { date: start, status: 'RESCHEDULED' },
         include: FULL_INCLUDE,
       });
+
+      // Moving this appointment off its old time frees whatever seat it
+      // held there — check if a waitlisted request for that old window
+      // can now be promoted.
+      const promoted = await promoteWaitlistedAppointments(tx);
+
+      return { updatedAppt, promoted };
     });
 
-    const client = updated.booking?.client;
+    const { updatedAppt, promoted } = updated;
+    notifyPromotedClients(promoted);
+
+    const client = updatedAppt.booking?.client;
     if (client?.user?.email) {
       sendEmail({
         to: client.user.email,
         template: 'appointmentRescheduled',
         data: {
           clientName: client.user.name,
-          serviceName: updated.service?.name,
-          appointmentTime: updated.date,
-          staffName: updated.staff?.user?.name,
+          serviceName: updatedAppt.service?.name,
+          appointmentTime: updatedAppt.date,
+          staffName: updatedAppt.staff?.user?.name,
         },
       }).catch((err) => console.error('Reschedule email failed:', err.message));
     }
 
-    return sendSuccess(res, updated, 200, 'Appointment rescheduled');
+    return sendSuccess(res, updatedAppt, 200, 'Appointment rescheduled');
   } catch (err) {
     return sendError(res, err.message, err.status || 400);
   }
