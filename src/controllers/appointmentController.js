@@ -58,6 +58,7 @@ async function assertSlotAvailable(tx, { staffId, start, end, excludeAppointment
       'This staff member already has an appointment during that time. Please choose a different time or staff member.'
     );
     err.status = 409;
+    err.code = 'SLOT_CONFLICT';
     throw err;
   }
 }
@@ -259,6 +260,50 @@ export const createAppointment = async (req, res) => {
       }).catch((err) => console.error('Confirmation SMS failed:', err.message));
     }
 
+    // New appointments need an admin or the assigned staff member to act
+    // on them — nothing else in this flow told anyone that happened.
+    // Without this, a booking (or a waitlist entry) could sit unnoticed
+    // until someone happens to open the dashboard. Best-effort/
+    // fire-and-forget, same as the notification calls elsewhere in this
+    // file: a notification hiccup must never fail the booking itself.
+    (async () => {
+      const when = result.date.toLocaleString('en-GH', {
+        weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      });
+      const clientLabel = contactName || 'A client';
+      const serviceLabel = result.service?.name ?? 'a service';
+      const message = isWaitlisted
+        ? `Waitlist: ${clientLabel} wants ${serviceLabel} on ${when} — every stylist is booked.`
+        : `New booking: ${clientLabel} requested ${serviceLabel} on ${when}.`;
+
+      // Every admin always gets notified — someone needs to be able to
+      // see and confirm new bookings even if no specific staff was chosen.
+      const admins = await prisma.user.findMany({
+        where: { role: 'ADMIN' },
+        select: { id: true },
+      });
+
+      const recipientIds = new Set(admins.map((a) => a.id));
+
+      // If the client requested a specific stylist and actually got
+      // assigned to them (not waitlisted), that stylist should know
+      // immediately too — don't make them wait for the queue fan-out
+      // that only fires once an admin confirms it.
+      if (!isWaitlisted && result.staff?.user?.id) {
+        recipientIds.add(result.staff.user.id);
+      }
+
+      if (recipientIds.size === 0) return;
+
+      await prisma.notification.createMany({
+        data: Array.from(recipientIds).map((userId) => ({
+          userId,
+          message,
+          type: 'APPOINTMENT',
+        })),
+      });
+    })().catch((err) => console.error('New-booking notification fan-out failed:', err));
+
     return sendSuccess(
       res,
       { ...result, bookingReference: result.booking?.id, waitlisted: isWaitlisted },
@@ -268,7 +313,14 @@ export const createAppointment = async (req, res) => {
         : 'Appointment booked'
     );
   } catch (err) {
-    return sendError(res, err.message, err.status || 400);
+    if (!err.status) {
+      // Unanticipated error (no explicit status was set by our own code) —
+      // never forward err.message to the client, it may be a raw
+      // Prisma/driver message describing internal schema details.
+      console.error('Unhandled error in appointment controller:', err);
+      return sendError(res, 'Something went wrong. Please try again.', 500);
+    }
+    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -464,7 +516,14 @@ export const updateAppointment = async (req, res) => {
 
     return sendSuccess(res, updatedAppt);
   } catch (err) {
-    return sendError(res, err.message, err.status || 400);
+    if (!err.status) {
+      // Unanticipated error (no explicit status was set by our own code) —
+      // never forward err.message to the client, it may be a raw
+      // Prisma/driver message describing internal schema details.
+      console.error('Unhandled error in appointment controller:', err);
+      return sendError(res, 'Something went wrong. Please try again.', 500);
+    }
+    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -527,6 +586,7 @@ export const claimAppointment = async (req, res) => {
       if (existing.staffId != null) {
         const err = new Error('Someone else already claimed this appointment.');
         err.status = 409;
+        err.code = 'ALREADY_CLAIMED';
         throw err;
       }
 
@@ -540,6 +600,7 @@ export const claimAppointment = async (req, res) => {
       if (!free) {
         const err = new Error("You already have an appointment that overlaps this time.");
         err.status = 409;
+        err.code = 'SLOT_CONFLICT';
         throw err;
       }
 
@@ -564,7 +625,14 @@ export const claimAppointment = async (req, res) => {
 
     return sendSuccess(res, updated);
   } catch (err) {
-    return sendError(res, err.message, err.status || 400);
+    if (!err.status) {
+      // Unanticipated error (no explicit status was set by our own code) —
+      // never forward err.message to the client, it may be a raw
+      // Prisma/driver message describing internal schema details.
+      console.error('Unhandled error in appointment controller:', err);
+      return sendError(res, 'Something went wrong. Please try again.', 500);
+    }
+    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -838,7 +906,14 @@ export const rescheduleAppointment = async (req, res) => {
 
     return sendSuccess(res, updatedAppt, 200, 'Appointment rescheduled');
   } catch (err) {
-    return sendError(res, err.message, err.status || 400);
+    if (!err.status) {
+      // Unanticipated error (no explicit status was set by our own code) —
+      // never forward err.message to the client, it may be a raw
+      // Prisma/driver message describing internal schema details.
+      console.error('Unhandled error in appointment controller:', err);
+      return sendError(res, 'Something went wrong. Please try again.', 500);
+    }
+    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
   }
 };
 

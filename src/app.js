@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import dotenv from "dotenv";
 import path from 'path';
 import swaggerUi from 'swagger-ui-express';
@@ -99,7 +99,10 @@ function rateLimitKey(req) {
       // invalid/expired — fall through to IP-based bucketing
     }
   }
-  return req.ip;
+  // ipKeyGenerator normalizes IPv6 addresses (collapses to a /64-equivalent
+  // prefix) so an attacker can't get a fresh rate-limit bucket just by
+  // requesting a new address within their own subnet.
+  return ipKeyGenerator(req.ip);
 }
 
 // General API rate limit as a floor for everything else. Auth's own
@@ -114,12 +117,36 @@ function rateLimitKey(req) {
 // reset, and — because the bucket was keyed by IP alone with no trust
 // proxy configured — every other role on the same network inherited the
 // lockout too.
+//
+// skip: /auth/login and /auth/register are already gated by their own
+// dedicated authLimiter below, which is the right tool for brute-force
+// protection — this general limiter doesn't need to double-count them.
+// That matters in practice: many different guests share one IP-keyed
+// bucket while browsing unauthenticated (services, slots, availability —
+// especially common here, where a lot of client traffic comes from
+// carrier-grade NAT on mobile data), and that shared bucket can fill up
+// well before any single guest ever logs in. Once it's full, the very
+// next login attempt from that IP got throttled by THIS limiter with a
+// generic "slow down" message — nothing to do with actual login
+// attempts, and confusing since the dedicated authLimiter never even
+// fired. /auth/logout is included too: it's authenticated, idempotent,
+// and low-risk, so there's no reason for it to draw from a budget shared
+// with unrelated public traffic on the same network. Staff/admin don't
+// hit this because their long-lived sessions are user-keyed (see
+// rateLimitKey above), isolating them from noisy shared-IP guest
+// traffic — this fix closes the same gap for clients.
+const EXEMPT_FROM_GENERAL_LIMITER = new Set([
+  '/auth/login',
+  '/auth/register',
+  '/auth/logout',
+]);
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: rateLimitKey,
+  skip: (req) => EXEMPT_FROM_GENERAL_LIMITER.has(req.path),
   message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
 });
 app.use(apiLimiter);
@@ -201,9 +228,22 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   console.error('Global error handler:', err);
-  res.status(err.status || 500).json({
+
+  const status = err.status || 500;
+  // Below 500, err.message was deliberately written by our own code to be
+  // shown to the user (validation messages, "already booked", etc). At
+  // 500 the error is, by definition, one we didn't anticipate — it could
+  // be a raw Prisma/driver/library message describing internal schema or
+  // query details, which must never reach the client. Log the real thing,
+  // show a generic message.
+  const message = status < 500
+    ? (err.message || 'Something went wrong. Please try again.')
+    : 'Something went wrong on our end. Please try again in a moment.';
+
+  res.status(status).json({
     success: false,
-    message: err.message || 'Internal server error',
+    message,
+    ...(err.code && status < 500 && { code: err.code }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 });
