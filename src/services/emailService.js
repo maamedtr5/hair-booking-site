@@ -1,16 +1,8 @@
 // services/emailService.js
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+import { getBusinessInfoConfig } from '../utils/businessInfo.js';
 
-// Create email transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email templates
 const emailTemplates = {
@@ -206,17 +198,29 @@ export const sendEmail = async ({ to, subject, template, data }) => {
 
     const emailContent = emailTemplates[template](data);
 
+    // Settings (admin-editable, via Settings > Business Information) is
+    // the source of truth now; the env var and hardcoded string are only
+    // there so this doesn't break for anyone who hasn't set it yet.
+    const businessInfo = await getBusinessInfoConfig();
+    const businessName = businessInfo.name || process.env.BUSINESS_NAME || 'Hair Booking';
+
     const mailOptions = {
-      from: `"${process.env.BUSINESS_NAME || 'Hair Booking'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
+      from: `"${businessName}" <${process.env.EMAIL_FROM}>`,
       to,
       subject: subject || emailContent.subject,
       html: emailContent.html,
       text: emailContent.text,
     };
 
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 Email sent successfully to ${to}: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    // Resend returns { data, error } rather than throwing — turn a
+    // failed send into a real rejected promise so this keeps behaving
+    // exactly like it did with nodemailer, which every call site's
+    // .catch(...) already expects.
+    const { data: sendResult, error } = await resend.emails.send(mailOptions);
+    if (error) throw new Error(error.message || 'Resend failed to send the email');
+
+    console.log(`📧 Email sent successfully to ${to}: ${sendResult.id}`);
+    return { success: true, messageId: sendResult.id };
   } catch (error) {
     console.error('Error sending email:', error.message);
     throw error;
@@ -224,16 +228,20 @@ export const sendEmail = async ({ to, subject, template, data }) => {
 };
 
 /**
- * Verify email configuration
+ * Verify email configuration — a lightweight, no-email-sent call that
+ * confirms RESEND_API_KEY is actually valid (401 if not), standing in
+ * for nodemailer's SMTP-handshake-based transporter.verify().
  */
 export const verifyEmailConfig = async () => {
   try {
-    await transporter.verify();
-    console.log('  Email server is ready to send messages');
+    if (!process.env.RESEND_API_KEY) throw new Error('RESEND_API_KEY is not set');
+    const { error } = await resend.apiKeys.list();
+    if (error) throw new Error(error.message || 'Invalid Resend API key');
+    console.log('  Email service (Resend) is configured');
     return true;
   } catch (error) {
     console.error('❌ Email configuration error:', error.message);
-    console.warn('Please check your EMAIL_HOST, EMAIL_USER, and EMAIL_PASSWORD in .env');
+    console.warn('Please check RESEND_API_KEY (and EMAIL_FROM) in .env');
     return false;
   }
 };

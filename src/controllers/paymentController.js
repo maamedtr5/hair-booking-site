@@ -25,6 +25,21 @@ async function resolveBookingAmount(bookingId) {
     throw new Error('Booking not found');
   }
 
+  // A WAITLISTED appointment doesn't have a slot yet — nothing is owed
+  // until promoteWaitlistedAppointments() promotes it to PENDING. Charging
+  // (or even quoting) a deposit before that point would take money for a
+  // booking that may never happen. The frontend already skips this call
+  // entirely for waitlisted bookings; this is the server-side backstop.
+  if (booking.appointment.status === 'WAITLISTED') {
+    const err = new Error(
+      'This booking is on the waitlist and does not require payment yet. ' +
+      'You will be notified when a slot opens up and payment is due.'
+    );
+    err.status = 409;
+    err.code = 'BOOKING_WAITLISTED';
+    throw err;
+  }
+
   let fullPrice = booking.appointment.service.price;
 
   if (booking.promocode && booking.promocode.isActive) {
@@ -54,7 +69,7 @@ export const getPaymentQuote = async (req, res) => {
     const { fullPrice, amountDue, isDeposit } = await resolveBookingAmount(bookingId);
     return sendSuccess(res, { fullPrice, amountDue, isDeposit });
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, err.message, err.status || 400, err.code ? { code: err.code } : {});
   }
 };
 
@@ -116,7 +131,7 @@ export const initializePayment = async (req, res) => {
     //    existing PENDING/FAILED one for retry.
     return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl, isDeposit }, existing ? 200 : 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, err.message, err.status || 400, err.code ? { code: err.code } : {});
   }
 };
 

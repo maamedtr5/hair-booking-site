@@ -7,6 +7,7 @@ import {
   updateSlot,
   deleteSlot,
   getAvailableSlots,
+  getMonthAvailability,
 } from '../controllers/slotController.js';
 import { validateSlotCreate, validateSlotUpdate } from '../validators/slotValidator.js';
 import { authenticate } from '../auth/authMiddleware.js';
@@ -18,6 +19,7 @@ const router = express.Router();
 // the only slot endpoint that's safe to be public — it returns computed
 // open times, not real records with client data attached.
 router.get('/available', getAvailableSlots);
+router.get('/month-availability', getMonthAvailability);
 
 // A Slot row always represents a real appointment's time block, which
 // (once the include bug is fixed) carries the client's name/email/phone

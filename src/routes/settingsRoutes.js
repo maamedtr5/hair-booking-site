@@ -25,6 +25,21 @@ router.get('/payment-policy', settingsController.getPaymentPolicy);
 router.get('/payment-policy/defaults', authenticate, requireRole('ADMIN', 'STAFF'), settingsController.getPaymentPolicyDefaults);
 router.put('/payment-policy', authenticate, requireRole('ADMIN'), settingsController.updatePaymentPolicy);
 
+// Salon location — address, map coordinates, getting-here notes. Read is
+// public for the same reason as payment policy: the "Getting Here"
+// section on the public site needs it, with no auth involved. Only
+// admins can change it.
+router.get('/salon-location', settingsController.getSalonLocation);
+router.get('/salon-location/defaults', authenticate, requireRole('ADMIN', 'STAFF'), settingsController.getSalonLocationDefaults);
+router.put('/salon-location', authenticate, requireRole('ADMIN'), settingsController.updateSalonLocation);
+
+// Business info — name/phone/email. Read is public: the name is shown on
+// the public site (and used as the outgoing-email display name), and
+// phone/email aren't sensitive. Only admins can change it.
+router.get('/business-info', settingsController.getBusinessInfo);
+router.get('/business-info/defaults', authenticate, requireRole('ADMIN', 'STAFF'), settingsController.getBusinessInfoDefaults);
+router.put('/business-info', authenticate, requireRole('ADMIN'), settingsController.updateBusinessInfo);
+
 // Generic settings CRUD — admin-only. Previously these only required
 // `authenticate`, meaning any logged-in client could read or overwrite
 // arbitrary business settings.

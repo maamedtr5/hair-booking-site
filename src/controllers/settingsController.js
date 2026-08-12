@@ -11,6 +11,16 @@ import {
   getPaymentPolicyConfig,
   setPaymentPolicyConfig,
 } from '../utils/paymentPolicy.js';
+import {
+  DEFAULT_SALON_LOCATION,
+  getSalonLocationConfig,
+  setSalonLocationConfig,
+} from '../utils/salonLocation.js';
+import {
+  DEFAULT_BUSINESS_INFO,
+  getBusinessInfoConfig,
+  setBusinessInfoConfig,
+} from '../utils/businessInfo.js';
 
 export const createSetting = async (req, res) => {
   try {
@@ -120,4 +130,55 @@ export const updatePaymentPolicy = async (req, res) => {
 
 export const getPaymentPolicyDefaults = async (_req, res) => {
   return sendSuccess(res, DEFAULT_PAYMENT_POLICY);
+};
+
+// ── Salon location — address, map coordinates, and admin-authored
+// getting-here notes (e.g. which trotro routes to take or avoid) shown
+// on the public site's "Getting Here" section. ──────────────────────────
+
+export const getSalonLocation = async (req, res) => {
+  try {
+    const location = await getSalonLocationConfig();
+    return sendSuccess(res, location);
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
+
+export const updateSalonLocation = async (req, res) => {
+  try {
+    await setSalonLocationConfig(req.body);
+    return sendSuccess(res, req.body, 200, 'Location updated');
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
+
+export const getSalonLocationDefaults = async (_req, res) => {
+  return sendSuccess(res, DEFAULT_SALON_LOCATION);
+};
+
+// ── Business info — name, phone, email shown to clients (and, for name,
+// used as the "From" display name on outgoing emails). ─────────────────
+
+export const getBusinessInfo = async (req, res) => {
+  try {
+    const info = await getBusinessInfoConfig();
+    return sendSuccess(res, info);
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
+
+export const updateBusinessInfo = async (req, res) => {
+  try {
+    await setBusinessInfoConfig(req.body);
+    return sendSuccess(res, req.body, 200, 'Business info updated');
+  } catch (err) {
+    return sendError(res, err.message, 400);
+  }
+};
+
+export const getBusinessInfoDefaults = async (_req, res) => {
+  return sendSuccess(res, DEFAULT_BUSINESS_INFO);
 };

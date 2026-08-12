@@ -16,11 +16,8 @@ export const env = {
   jwtSecret: process.env.JWT_SECRET,
   paystackSecret: process.env.PAYSTACK_SECRET,
 
-  // Email + business info
-  EMAIL_HOST: process.env.EMAIL_HOST,
-  EMAIL_PORT: process.env.EMAIL_PORT,
-  EMAIL_USER: process.env.EMAIL_USER,
-  EMAIL_PASSWORD: process.env.EMAIL_PASSWORD,
+  // Email (Resend) + business info
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
   EMAIL_FROM: process.env.EMAIL_FROM,
   BUSINESS_NAME: process.env.BUSINESS_NAME,
   BUSINESS_ADDRESS: process.env.BUSINESS_ADDRESS,
