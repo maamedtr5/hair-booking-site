@@ -85,9 +85,19 @@ async function isStaffFreeAt(tx, { staffId, start, end, excludeAppointmentId }) 
 // silently double-booking.
 async function withConflictCheck(work) {
   const MAX_ATTEMPTS = 3;
+  // Default Prisma interactive-transaction timeout is 5000ms. This
+  // transaction does several sequential round trips (resolve/create
+  // guest account, look up service, conflict-check query, promo-code
+  // lookup, two creates, one read-back) — comfortably under 5s against a
+  // warm connection, but Neon's pooled/serverless compute can take several
+  // seconds to wake from idle, and that latency eats directly into this
+  // budget. Bumped to give real headroom without masking genuinely slow
+  // queries (P2028 should still fire well before a user would call the
+  // request "hung").
+  const TRANSACTION_OPTIONS = { isolationLevel: 'Serializable', timeout: 15000, maxWait: 10000 };
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     try {
-      return await prisma.$transaction(work, { isolationLevel: 'Serializable' });
+      return await prisma.$transaction(work, TRANSACTION_OPTIONS);
     } catch (err) {
       if (err.code === 'P2034' && attempt < MAX_ATTEMPTS - 1) {
         // Small backoff so the winning transaction has time to actually
@@ -184,10 +194,26 @@ function notifyPromotedClients(promoted) {
 export const createAppointment = async (req, res) => {
   try {
     const { serviceId, staffId, date, notes, promoCode } = req.body;
-    const { clientId, contactEmail, contactPhone, contactName } =
-      await resolveClientForRequest(req);
+
+    // resolveClientForRequest now runs INSIDE the transaction below (it's
+    // passed `tx`), not before it. Previously it ran here, ahead of
+    // withConflictCheck, which meant a guest's User+Client account could
+    // commit successfully and then the appointment/booking write could
+    // still fail afterwards (a slot conflict, or the DB connection
+    // stalling under load) — leaving an orphaned account with no booking.
+    // That account then permanently blocked the same email from ever
+    // trying again with ACCOUNT_EXISTS, even though nothing was actually
+    // booked. Running both in one atomic transaction means either the
+    // whole booking succeeds — account included — or none of it commits.
+    let contactEmail, contactPhone, contactName;
 
     const result = await withConflictCheck(async (tx) => {
+      const resolved = await resolveClientForRequest(req, tx);
+      const { clientId } = resolved;
+      contactEmail = resolved.contactEmail;
+      contactPhone = resolved.contactPhone;
+      contactName = resolved.contactName;
+
       const service = await tx.service.findUnique({ where: { id: parseInt(serviceId, 10) } });
       if (!service) {
         const err = new Error('Service not found');

@@ -4,10 +4,20 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
 
-export async function resolveClientForRequest(req) {
+/**
+ * `db` is either the top-level `prisma` client or an active transaction
+ * client (`tx`). Callers that need this atomic with an appointment/booking
+ * write (see appointmentController.createAppointment) MUST pass `tx` —
+ * otherwise a guest User+Client can commit here and then the booking write
+ * fails downstream (a slot conflict, a transient DB timeout, etc.),
+ * leaving an orphaned account with no appointment. That account then
+ * permanently blocks the same email from ever booking again with
+ * ACCOUNT_EXISTS, even though nothing was actually booked.
+ */
+export async function resolveClientForRequest(req, db = prisma) {
   // --- Logged-in path ---
   if (req.user?.id) {
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: req.user.id },
       include: { client: true },
     });
@@ -24,8 +34,8 @@ export async function resolveClientForRequest(req) {
         contactName: user.name,
       };
     }
-   
-    const client = await prisma.client.create({
+
+    const client = await db.client.create({
       data: { userId: user.id, phone: req.body.guestPhone ?? null },
     });
     return {
@@ -47,7 +57,7 @@ export async function resolveClientForRequest(req) {
   }
 
   const email = guestEmail.toLowerCase().trim();
-  const existingUser = await prisma.user.findUnique({
+  const existingUser = await db.user.findUnique({
     where: { email },
     include: { client: true },
   });
@@ -70,6 +80,8 @@ export async function resolveClientForRequest(req) {
     throw err;
   }
 
+  // Deliberately not retrievable by the guest — this account exists only
+  // to hold the Client relation, never to be logged into directly.
   const randomPassword = crypto.randomBytes(32).toString('hex');
   const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
@@ -84,7 +96,7 @@ export async function resolveClientForRequest(req) {
   // friendly, actionable 409 instead.
   let newUser;
   try {
-    newUser = await prisma.user.create({
+    newUser = await db.user.create({
       data: { name: guestName, email, password: hashedPassword, role: 'CLIENT' },
     });
   } catch (createErr) {
@@ -98,7 +110,7 @@ export async function resolveClientForRequest(req) {
     }
     throw createErr;
   }
-  const client = await prisma.client.create({
+  const client = await db.client.create({
     data: { userId: newUser.id, phone: guestPhone },
   });
 
