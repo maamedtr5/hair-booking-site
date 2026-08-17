@@ -38,7 +38,7 @@ export const scheduleAppointmentReminder = async (appointmentId, minutesBefore =
       include: {
         client: { include: { user: true } },
         service: true,
-        staff: true,
+        staff: { include: { user: true } },
       },
     });
 
@@ -54,9 +54,9 @@ export const scheduleAppointmentReminder = async (appointmentId, minutesBefore =
       const formattedTime = moment(appointment.date).format('MMMM Do YYYY, h:mm A');
 
       const reminderData = {
-        clientName: appointment.client?.user?.name || `${appointment.client?.firstName} ${appointment.client?.lastName}`,
+        clientName: appointment.client?.user?.name || 'there',
         serviceName: appointment.service?.name || 'Your service',
-        staffName: appointment.staff?.name,
+        staffName: appointment.staff?.user?.name || 'your stylist',
         appointmentTime: formattedTime,
         appointmentId: appointment.id,
       };

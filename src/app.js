@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
+import cookieParser from "cookie-parser";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import dotenv from "dotenv";
 import path from 'path';
@@ -12,6 +13,8 @@ import YAML from 'yamljs';
 import jwt from 'jsonwebtoken';
 import { authenticate } from './auth/authMiddleware.js';
 import { requireRole } from './middleware/roleMiddleware.js';
+import { csrfProtection } from './middleware/csrfProtection.js';
+import { extractToken } from './utils/extractToken.js';
 
 import adminRoutes from "./routes/adminRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
@@ -82,15 +85,23 @@ app.use(express.json({
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
-// Best-effort: pull a verified user id out of the Authorization header so
-// the rate limiter can bucket by *person* instead of by *device/network*.
-// Two different logged-in users (e.g. admin then staff testing on the same
-// computer, or a whole salon behind one office IP) must never share a
-// budget. Falls back to req.ip for guests/invalid tokens — never throws.
+// Runs after cookie-parser (needs req.cookies) and before the route
+// tables below (needs to run on every mutating request across all of
+// them, not just auth's own routes) — this is the actual CSRF defense
+// for the httpOnly-cookie session; see csrfProtection.js for why a
+// double-submit cookie is still needed on top of SameSite=Lax.
+app.use(csrfProtection);
+
+// Best-effort: pull a verified user id out of the session token (cookie
+// or Authorization header — see extractToken) so the rate limiter can
+// bucket by *person* instead of by *device/network*. Two different
+// logged-in users (e.g. admin then staff testing on the same computer, or
+// a whole salon behind one office IP) must never share a budget. Falls
+// back to req.ip for guests/invalid tokens — never throws.
 function rateLimitKey(req) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.split(' ')[1];
+  const token = extractToken(req);
   if (token) {
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -139,6 +150,8 @@ const EXEMPT_FROM_GENERAL_LIMITER = new Set([
   '/auth/login',
   '/auth/register',
   '/auth/logout',
+  '/auth/verify-otp',
+  '/auth/resend-otp',
 ]);
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,

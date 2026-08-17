@@ -6,6 +6,44 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email templates
 const emailTemplates = {
+  adminOtpCode: (data) => ({
+    subject: `Your sign-in code: ${data.code}`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 480px; margin: 0 auto; background: white; }
+            .header { background: #241a11; color: #f0e6d8; padding: 24px; text-align: center; }
+            .content { padding: 30px; text-align: center; }
+            .code { font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #241a11;
+                     background: #f0e6d8; padding: 16px 24px; border-radius: 8px; display: inline-block; margin: 16px 0; }
+            .fine-print { color: #6b5240; font-size: 13px; margin-top: 24px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header"><h1 style="margin:0;font-size:20px;">Sign-in verification</h1></div>
+            <div class="content">
+              <p>Hi ${data.name},</p>
+              <p>Use this code to finish signing in to the admin dashboard:</p>
+              <div class="code">${data.code}</div>
+              <p>This code expires in 5 minutes.</p>
+              <p class="fine-print">
+                If you didn't try to sign in, you can ignore this email — your
+                account is still safe. Consider changing your password if this
+                keeps happening.
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `Hi ${data.name}, your sign-in code is ${data.code}. It expires in 5 minutes. If you didn't try to sign in, ignore this email.`,
+  }),
+
   appointmentReminder: (data) => ({
     subject: `⏰ Reminder: Your ${data.serviceName} Appointment Tomorrow`,
     html: `... existing HTML reminder template ...`,

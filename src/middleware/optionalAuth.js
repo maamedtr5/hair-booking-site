@@ -1,12 +1,10 @@
 // src/middleware/optionalAuth.js
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
+import { extractToken } from '../utils/extractToken.js';
 
 export const optionalAuth = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return next();
-
-  const token = authHeader.split(' ')[1];
+  const token = extractToken(req);
   if (!token) return next();
 
   try {

@@ -14,7 +14,8 @@ model User {
   email    String @unique
   password String
   role     Role   @default(CLIENT)
-  sessions Session[] 
+  sessions Session[]
+  loginOtps LoginOtp[]
 
   // Google Calendar integration
   googleAccessToken   String?   @db.Text
@@ -340,6 +341,25 @@ model Session {
   createdAt DateTime  @default(now())
   expiresAt DateTime
   revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Second factor for ADMIN login. The code itself is never stored — only
+// its hash — so a DB read alone can't be used to log in. `attempts` caps
+// brute-force guesses against a single code; `consumedAt` prevents replay
+// of an already-used code. One row per OTP sent (not one row per user)
+// so a resend can't silently invalidate rate-limit history.
+model LoginOtp {
+  id         String    @id @default(cuid())
+  userId     Int
+  codeHash   String
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

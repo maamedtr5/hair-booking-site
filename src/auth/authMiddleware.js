@@ -1,9 +1,10 @@
 // src/auth/authMiddleware.js
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
+import { extractToken } from '../utils/extractToken.js';
 
 export const authenticate = async (req, res, next) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = extractToken(req);
   if (!token) return res.status(401).json({ success: false, message: 'No token provided' });
 
   try {
