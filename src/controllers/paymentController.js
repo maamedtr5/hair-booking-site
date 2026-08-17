@@ -101,7 +101,10 @@ export const initializePayment = async (req, res) => {
     }
 
     if (amountDue <= 0) {
-      return sendError(res, 'No payment is required for this booking.', 400);
+      const err = new Error('No payment is required for this booking.');
+      err.status = 400;
+      err.code = 'NO_PAYMENT_REQUIRED';
+      throw err;
     }
 
     const existing = await prisma.payment.findUnique({ where: { bookingId } });
