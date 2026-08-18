@@ -4,6 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { register, login, logout, logoutAll, verifyOtp, resendOtp } from './authController.js';
 import { validateRegister, validateLogin } from '../validators/authValidator.js';
 import { authenticate } from './authMiddleware.js';
+import { optionalAuth } from '../middleware/optionalAuth.js';
 
 const router = express.Router();
 
@@ -33,7 +34,13 @@ router.post('/register', authLimiter, validateRegister, register);
 router.post('/login', authLimiter, validateLogin, login);
 router.post('/verify-otp', otpLimiter, verifyOtp);
 router.post('/resend-otp', otpLimiter, resendOtp);
-router.post('/logout', authenticate, logout);
+// optionalAuth (not authenticate): logout must be idempotent. If there's
+// no session (already logged out, expired cookie, guest who never logged
+// in), this still returns 200 and clears cookies instead of 401 — a 401
+// here is what was causing the frontend's global 401 handler to treat
+// "you're already logged out" as "your session died", re-fire another
+// logout call, get another 401, and loop forever (see apiClient.ts).
+router.post('/logout', optionalAuth, logout);
 router.post('/logout-all', authenticate, logoutAll);
 
 export default router;
