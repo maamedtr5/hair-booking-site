@@ -1,6 +1,6 @@
 // validators/adminValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
 
@@ -58,7 +58,7 @@ export const validateAdminCreate = [
   body('userId')
     .notEmpty().withMessage('User ID is required')
     .isInt({ min: 1 }).withMessage('Invalid user ID')
-    .custom(async (userId) => {
+    .custom(withSafeValidation(async (userId) => {
       // Check if user exists
       const user = await prisma.user.findUnique({ 
         where: { id: parseInt(userId) } 
@@ -83,7 +83,7 @@ export const validateAdminCreate = [
       }
 
       return true;
-    }),
+    })),
 
   body('permissions')
     .optional({ nullable: true })
@@ -114,7 +114,7 @@ export const validateAdminCreate = [
 export const validateAdminUpdate = [
   param('id')
     .isInt().withMessage('Invalid admin ID')
-    .custom(async (id) => {
+    .custom(withSafeValidation(async (id) => {
       const admin = await prisma.admin.findUnique({
         where: { id: parseInt(id) },
       });
@@ -124,7 +124,7 @@ export const validateAdminUpdate = [
       }
       
       return true;
-    }),
+    })),
 
   body('permissions')
     .optional({ nullable: true })
@@ -182,7 +182,7 @@ export const validateAdminPermissionUpdate = [
 export const validateAdminDelete = [
   param('id')
     .isInt().withMessage('Invalid admin ID')
-    .custom(async (id, { req }) => {
+    .custom(withSafeValidation(async (id, { req }) => {
       const admin = await prisma.admin.findUnique({
         where: { id: parseInt(id) },
         include: { user: true },
@@ -204,7 +204,7 @@ export const validateAdminDelete = [
       }
 
       return true;
-    }),
+    })),
 
   handleValidationErrors,
 ];

@@ -4,12 +4,13 @@ import { prisma } from '../lib/prisma.js';
 import formModel from '../models/form.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 export const createForm = async (req, res) => {
   try {
     const form = await formModel.createForm(req.body);
     return sendSuccess(res, form, 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -19,7 +20,7 @@ export const getForm = async (req, res) => {
     if (!form) return sendError(res, 'Form not found', 404);
     return sendSuccess(res, form);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -41,7 +42,7 @@ export const getForms = async (req, res) => {
 
     return sendSuccess(res, forms);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -50,7 +51,7 @@ export const updateForm = async (req, res) => {
     const form = await formModel.updateForm(parseInt(req.params.id), req.body);
     return sendSuccess(res, form);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -59,6 +60,6 @@ export const deleteForm = async (req, res) => {
     await formModel.deleteForm(parseInt(req.params.id));
     return sendSuccess(res, null, 200, 'Form deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

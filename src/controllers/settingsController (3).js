@@ -1,6 +1,7 @@
 // controllers/settingsController.js
 import settingsModel from '../models/settings.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { safeErrorMessage } from '../utils/errorMessages.js';
 import {
   DEFAULT_BUSINESS_HOURS,
   getBusinessHoursConfig,
@@ -27,7 +28,7 @@ export const createSetting = async (req, res) => {
     const setting = await settingsModel.createSetting(req.body);
     return sendSuccess(res, setting, 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -37,7 +38,7 @@ export const getSetting = async (req, res) => {
     if (!setting) return sendError(res, 'Setting not found', 404);
     return sendSuccess(res, setting);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -47,7 +48,7 @@ export const getSettingByKey = async (req, res) => {
     if (!setting) return sendError(res, 'Setting not found', 404);
     return sendSuccess(res, setting);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -60,7 +61,7 @@ export const getSettings = async (req, res) => {
     const settings = await settingsModel.getAllSettings();
     return sendSuccess(res, settings);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -69,7 +70,7 @@ export const updateSetting = async (req, res) => {
     const setting = await settingsModel.updateSetting(parseInt(req.params.id), req.body);
     return sendSuccess(res, setting);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -78,7 +79,7 @@ export const deleteSetting = async (req, res) => {
     await settingsModel.deleteSetting(parseInt(req.params.id));
     return sendSuccess(res, null, 200, 'Setting deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -91,7 +92,7 @@ export const getBusinessHours = async (req, res) => {
     const config = await getBusinessHoursConfig();
     return sendSuccess(res, config);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -100,7 +101,7 @@ export const updateBusinessHours = async (req, res) => {
     await setBusinessHoursConfig(req.body);
     return sendSuccess(res, req.body, 200, 'Business hours updated');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -115,7 +116,7 @@ export const getPaymentPolicy = async (req, res) => {
     const policy = await getPaymentPolicyConfig();
     return sendSuccess(res, policy);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -124,7 +125,7 @@ export const updatePaymentPolicy = async (req, res) => {
     await setPaymentPolicyConfig(req.body);
     return sendSuccess(res, req.body, 200, 'Payment policy updated');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -141,7 +142,7 @@ export const getSalonLocation = async (req, res) => {
     const location = await getSalonLocationConfig();
     return sendSuccess(res, location);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -150,7 +151,7 @@ export const updateSalonLocation = async (req, res) => {
     await setSalonLocationConfig(req.body);
     return sendSuccess(res, req.body, 200, 'Location updated');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -166,7 +167,7 @@ export const getBusinessInfo = async (req, res) => {
     const info = await getBusinessInfoConfig();
     return sendSuccess(res, info);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -175,7 +176,7 @@ export const updateBusinessInfo = async (req, res) => {
     await setBusinessInfoConfig(req.body);
     return sendSuccess(res, req.body, 200, 'Business info updated');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 

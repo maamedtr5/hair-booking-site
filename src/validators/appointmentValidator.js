@@ -1,6 +1,6 @@
  // validators/appointmentValidator.js (add this to existing)
 import { body, param } from 'express-validator';
-import { handleValidationErrors, isFutureDate } from './validationHelpers.js';
+import { handleValidationErrors, isFutureDate, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 import { getBusinessHoursConfig, isWithinBusinessHours } from '../utils/businessHours.js';
 
@@ -9,7 +9,7 @@ export const validateAppointmentCreate = [
   body('serviceId')
     .notEmpty().withMessage('Service ID is required')
     .isInt({ min: 1 }).withMessage('Invalid service ID')
-    .custom(async (serviceId) => {
+    .custom(withSafeValidation(async (serviceId) => {
       const service = await prisma.service.findUnique({ 
         where: { id: parseInt(serviceId) } 
       });
@@ -20,12 +20,12 @@ export const validateAppointmentCreate = [
         throw new Error('Service is not available');
       }
       return true;
-    }),
+    })),
 
   body('staffId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid staff ID')
-    .custom(async (staffId) => {
+    .custom(withSafeValidation(async (staffId) => {
       if (staffId) {
         const staff = await prisma.staff.findUnique({ 
           where: { id: parseInt(staffId) } 
@@ -35,7 +35,7 @@ export const validateAppointmentCreate = [
         }
       }
       return true;
-    }),
+    })),
 
   body('date')
     .notEmpty().withMessage('Appointment date is required')
@@ -46,13 +46,13 @@ export const validateAppointmentCreate = [
       }
       return true;
     })
-    .custom(async (value) => {
+    .custom(withSafeValidation(async (value) => {
       const config = await getBusinessHoursConfig();
       if (!isWithinBusinessHours(new Date(value), config)) {
         throw new Error('Appointment must be during business hours');
       }
       return true;
-    }),
+    })),
 
   body('notes')
     .optional()
@@ -120,7 +120,7 @@ export const validateAppointmentUpdate = [
   body('serviceId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid service ID')
-    .custom(async (serviceId) => {
+    .custom(withSafeValidation(async (serviceId) => {
       const service = await prisma.service.findUnique({ 
         where: { id: parseInt(serviceId) } 
       });
@@ -128,12 +128,12 @@ export const validateAppointmentUpdate = [
         throw new Error('Service not found');
       }
       return true;
-    }),
+    })),
 
   body('staffId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid staff ID')
-    .custom(async (staffId) => {
+    .custom(withSafeValidation(async (staffId) => {
       const staff = await prisma.staff.findUnique({ 
         where: { id: parseInt(staffId) } 
       });
@@ -141,7 +141,7 @@ export const validateAppointmentUpdate = [
         throw new Error('Staff member not found');
       }
       return true;
-    }),
+    })),
 
   body('date')
     .optional()
@@ -152,13 +152,13 @@ export const validateAppointmentUpdate = [
       }
       return true;
     })
-    .custom(async (value) => {
+    .custom(withSafeValidation(async (value) => {
       const config = await getBusinessHoursConfig();
       if (!isWithinBusinessHours(new Date(value), config)) {
         throw new Error('Appointment must be during business hours');
       }
       return true;
-    }),
+    })),
 
   body('status')
     .optional()

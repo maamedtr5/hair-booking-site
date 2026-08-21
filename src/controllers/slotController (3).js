@@ -4,6 +4,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import { computeAvailableSlots } from '../utils/availability.js';
 import { getBusinessHoursConfig, getDayBounds } from '../utils/businessHours.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 // Slot -> Appointment -> Booking -> Client -> User is the real relation
 // chain (Appointment has no direct `client`/`user` field). The previous
 // version included `appointment: { client: true, user: true }`, which
@@ -32,7 +33,7 @@ export const createSlot = async (req, res) => {
     const slot = await prisma.slot.create({ data: req.body, include: SLOT_INCLUDE });
     return sendSuccess(res, sanitizeSlot(slot), 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -69,7 +70,7 @@ export const getSlotById = async (req, res) => {
     }
     return sendSuccess(res, sanitizeSlot(slot));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -83,7 +84,7 @@ export const updateSlot = async (req, res) => {
     });
     return sendSuccess(res, sanitizeSlot(slot));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -93,7 +94,7 @@ export const deleteSlot = async (req, res) => {
     await prisma.slot.delete({ where: { id: parseInt(req.params.id) } });
     return sendSuccess(res, null, 200, 'Slot deleted');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 

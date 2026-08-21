@@ -1,6 +1,7 @@
 // src/controllers/webhookController.js
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma.js';
+import { safeErrorMessage } from '../utils/errorMessages.js';
 
 
 const RELEVANT_EVENTS = new Set(['charge.success', 'charge.failed']);
@@ -65,6 +66,6 @@ export const paystackWebhook = async (req, res) => {
     return res.sendStatus(200);
   } catch (err) {
     console.error('Paystack webhook error:', err);
-    return res.status(400).json({ success: false, message: err.message });
+    return res.status(400).json({ success: false, message: safeErrorMessage(err, 'Webhook processing failed.') });
   }
 };

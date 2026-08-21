@@ -7,6 +7,7 @@ import {
 } from '../models/waitlist.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 // Utility: sanitize nested client data
 function sanitizeWaitlist(waitlist) {
   if (!waitlist) return null;
@@ -26,7 +27,7 @@ export async function addToWaitlistHandler(req, res) {
     const waitlist = await addToWaitlist(req.body);
     return sendSuccess(res, sanitizeWaitlist(waitlist), 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -42,7 +43,7 @@ export async function getWaitlistEntryHandler(req, res) {
 
     return sendSuccess(res, sanitizeWaitlist(waitlist));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -59,7 +60,7 @@ export async function getWaitlistEntriesHandler(req, res) {
 
     return sendSuccess(res, waitlists.map(sanitizeWaitlist));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -71,7 +72,7 @@ export async function updateWaitlistEntryHandler(req, res) {
 
     return sendSuccess(res, sanitizeWaitlist(waitlist));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -83,6 +84,6 @@ export async function deleteWaitlistEntryHandler(req, res) {
 
     return sendSuccess(res, null, 200, 'Entry deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }

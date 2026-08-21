@@ -8,13 +8,14 @@ import {
 } from '../models/staff.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 //   Create new staff
 export const createStaffHandler = async (req, res) => {
   try {
     const staff = await createStaff(req.body);
     return sendSuccess(res, staff, 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -30,7 +31,7 @@ export const getStaffHandler = async (req, res) => {
 
     return sendSuccess(res, staff);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -49,7 +50,7 @@ export const getStaffsHandler = async (req, res) => {
 
     return sendSuccess(res, staff);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -60,7 +61,7 @@ export const updateStaffHandler = async (req, res) => {
     const updated = await updateStaff(staffId, req.body);
     return sendSuccess(res, updated);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -71,6 +72,6 @@ export const deleteStaffHandler = async (req, res) => {
     await deleteStaff(staffId);
     return sendSuccess(res, null, 200, 'Staff deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

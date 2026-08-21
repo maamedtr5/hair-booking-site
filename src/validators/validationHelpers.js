@@ -1,5 +1,33 @@
 // validators/validationHelpers.js
 import { validationResult } from 'express-validator';
+import { isDeliberateAppError } from '../utils/errorMessages.js';
+
+/**
+ * Wraps a .custom() validator callback that performs its own Prisma
+ * lookups (rather than going through a controller's try/catch).
+ * express-validator collects whatever a custom validator throws and puts
+ * its .message straight into the response body via handleValidationErrors
+ * below — so a raw Prisma/driver failure inside a validator (a connection
+ * blip, a Neon cold-start timeout) would otherwise leak verbatim, in a
+ * code path controllers never see.
+ *
+ * Deliberate throws the validator already does on purpose (e.g.
+ * `throw new Error('Client not found')`, written directly in the
+ * validator to be shown to the user) pass through completely unchanged —
+ * only genuine Prisma/driver/runtime failures get swapped for a generic
+ * message.
+ */
+export function withSafeValidation(fn, fallbackMessage = 'Something went wrong while checking that. Please try again.') {
+  return async (...args) => {
+    try {
+      return await fn(...args);
+    } catch (err) {
+      if (isDeliberateAppError(err)) throw err;
+      console.error(err);
+      throw new Error(fallbackMessage);
+    }
+  };
+}
 
 /**
  * Middleware to check validation results

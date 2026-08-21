@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js'; // was missing — GET /bookings 500'
 import bookingModel from '../models/booking.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 function sanitizeBooking(booking) {
   if (!booking) return null;
   const safe = { ...booking };
@@ -34,7 +35,7 @@ export const createBooking = async (req, res) => {
     const booking = await bookingModel.createBooking(data);
     return sendSuccess(res, sanitizeBooking(booking), 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -60,7 +61,7 @@ export const getBooking = async (req, res) => {
 
     return sendSuccess(res, sanitizeBooking(booking));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -77,7 +78,7 @@ export const getBookings = async (req, res) => {
     });
     return sendSuccess(res, bookings.map(sanitizeBooking));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -92,7 +93,7 @@ export const updateBooking = async (req, res) => {
     const booking = await bookingModel.updateBooking(parseInt(req.params.id, 10), data);
     return sendSuccess(res, sanitizeBooking(booking));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -101,6 +102,6 @@ export const deleteBooking = async (req, res) => {
     await bookingModel.deleteBooking(parseInt(req.params.id, 10));
     return sendSuccess(res, null, 200, 'Booking deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

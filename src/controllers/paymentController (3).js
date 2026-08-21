@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { getPaymentPolicyConfig, computeDepositAmount } from '../utils/paymentPolicy.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 // Computes the authoritative charge amount server-side from the booking's
 // service price (+ active promocode discount), rather than trusting whatever
 // `amount` the client sends. A client-supplied amount must never be charged
@@ -69,7 +70,7 @@ export const getPaymentQuote = async (req, res) => {
     const { fullPrice, amountDue, isDeposit } = await resolveBookingAmount(bookingId);
     return sendSuccess(res, { fullPrice, amountDue, isDeposit });
   } catch (err) {
-    return sendError(res, err.message, err.status || 400, err.code ? { code: err.code } : {});
+    return sendError(res, safeErrorMessage(err), err.status || 400, err.code ? { code: err.code } : {});
   }
 };
 
@@ -134,7 +135,7 @@ export const initializePayment = async (req, res) => {
     //    existing PENDING/FAILED one for retry.
     return sendSuccess(res, { payment, checkoutUrl: response.checkoutUrl, isDeposit }, existing ? 200 : 201);
   } catch (err) {
-    return sendError(res, err.message, err.status || 400, err.code ? { code: err.code } : {});
+    return sendError(res, safeErrorMessage(err), err.status || 400, err.code ? { code: err.code } : {});
   }
 };
 
@@ -186,7 +187,7 @@ export const recordManualPayment = async (req, res) => {
 
     return sendSuccess(res, payment, existing ? 200 : 201, 'Payment recorded');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -214,7 +215,7 @@ export const markPaymentSuccess = async (req, res) => {
     //    200 OK (resource updated)
     return sendSuccess(res, payment);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -236,7 +237,7 @@ export const markPaymentFailed = async (req, res) => {
     //    200 OK (resource updated)
     return sendSuccess(res, payment);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -254,7 +255,7 @@ export const markPaymentRefunded = async (req, res) => {
     });
     return sendSuccess(res, payment, 200, 'Payment marked as refunded');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -283,6 +284,6 @@ export const getPayments = async (req, res) => {
     //    200 OK for successful retrieval
     return sendSuccess(res, payments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

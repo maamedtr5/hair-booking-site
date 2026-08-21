@@ -2,6 +2,7 @@
 import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 const isStaffOrAdmin = (role) => ['ADMIN', 'STAFF'].includes(role);
 
 export const createNotificationHandler = async (req, res) => {
@@ -12,7 +13,7 @@ export const createNotificationHandler = async (req, res) => {
     });
     return sendSuccess(res, notification, 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -32,7 +33,7 @@ export const getNotificationsHandler = async (req, res) => {
     });
     return sendSuccess(res, notifications);
   } catch (err) {
-    return sendError(res, err.message, 500);
+    return sendError(res, safeErrorMessage(err), 500);
   }
 };
 
@@ -52,7 +53,7 @@ export const bulkMarkAsReadHandler = async (req, res) => {
     await prisma.notification.updateMany({ where: { id: { in: ids } }, data: { read: true } });
     return sendSuccess(res, { count: ids.length }, 200, 'Notifications marked as read');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -65,7 +66,7 @@ export const markAllAsReadHandler = async (req, res) => {
     await prisma.notification.updateMany({ where: { userId }, data: { read: true } });
     return sendSuccess(res, null, 200, 'All notifications marked as read');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -82,7 +83,7 @@ export const getAllNotificationsHandler = async (req, res) => {
     });
     return sendSuccess(res, notifications);
   } catch (err) {
-    return sendError(res, err.message, 500);
+    return sendError(res, safeErrorMessage(err), 500);
   }
 };
 
@@ -96,7 +97,7 @@ export const getNotificationByIdHandler = async (req, res) => {
     }
     return sendSuccess(res, notification);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -115,7 +116,7 @@ export const updateNotificationHandler = async (req, res) => {
     });
     return sendSuccess(res, updated);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -130,6 +131,6 @@ export const deleteNotificationHandler = async (req, res) => {
     await prisma.notification.delete({ where: { id } });
     return sendSuccess(res, null, 200, 'Notification deleted');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

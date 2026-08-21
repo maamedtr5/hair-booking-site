@@ -1,6 +1,6 @@
 // validators/formValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
 
@@ -40,7 +40,7 @@ export const validateFormCreate = [
   body('clientId')
     .notEmpty().withMessage('Client ID is required')
     .isInt({ min: 1 }).withMessage('Invalid client ID')
-    .custom(async (clientId) => {
+    .custom(withSafeValidation(async (clientId) => {
       const client = await prisma.client.findUnique({
         where: { id: parseInt(clientId) },
       });
@@ -48,12 +48,12 @@ export const validateFormCreate = [
         throw new Error('Client not found');
       }
       return true;
-    }),
+    })),
 
   body('bookingId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid booking ID')
-    .custom(async (bookingId) => {
+    .custom(withSafeValidation(async (bookingId) => {
       if (bookingId) {
         const booking = await prisma.booking.findUnique({
           where: { id: parseInt(bookingId) },
@@ -63,7 +63,7 @@ export const validateFormCreate = [
         }
       }
       return true;
-    }),
+    })),
 
   body('title')
     .trim()

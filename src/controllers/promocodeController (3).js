@@ -3,12 +3,13 @@ import { prisma } from '../lib/prisma.js';
 import promocodeModel from '../models/promocode.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 export const createPromocode = async (req, res) => {
   try {
     const promocode = await promocodeModel.createPromocode(req.body);
     return sendSuccess(res, promocode, 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -18,7 +19,7 @@ export const getPromocode = async (req, res) => {
     if (!promocode) return sendError(res, 'Promocode not found', 404);
     return sendSuccess(res, promocode);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -28,7 +29,7 @@ export const getPromocodeByCode = async (req, res) => {
     if (!promocode) return sendError(res, 'Promocode not found', 404);
     return sendSuccess(res, promocode);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -48,7 +49,7 @@ export const getPromocodes = async (req, res) => {
 
     return sendSuccess(res, promocodes);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -57,7 +58,7 @@ export const updatePromocode = async (req, res) => {
     const promocode = await promocodeModel.updatePromocode(parseInt(req.params.id), req.body);
     return sendSuccess(res, promocode);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -66,6 +67,6 @@ export const deletePromocode = async (req, res) => {
     await promocodeModel.deletePromocode(parseInt(req.params.id));
     return sendSuccess(res, null, 200, 'Promocode deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

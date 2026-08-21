@@ -14,6 +14,12 @@ const isStrongPassword = (password) =>
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 1 day
 const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const OTP_MAX_ATTEMPTS = 5;
+// Kill switch for admin 2FA. All the OTP code below stays in place —
+// this just decides whether login() branches into it. Flip
+// ADMIN_OTP_ENABLED=true in .env when ready to turn it back on; nothing
+// else needs to change. Defaults OFF (safer to fail open to "unset" than
+// to silently require a code no one asked for).
+const ADMIN_OTP_ENABLED = process.env.ADMIN_OTP_ENABLED === 'true';
 // Separate secret purpose from the real session JWT via a distinct claim
 // (`purpose: 'login-otp'`) rather than a separate signing secret — simpler
 // to operate, and authMiddleware already rejects anything without a valid
@@ -176,7 +182,7 @@ export const login = async (req, res) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: email.toLowerCase().trim() },
       include: { staff: true, client: true, admin: true },
     });
     if (!user) return sendError(res, 'Invalid credentials', 401);
@@ -188,7 +194,7 @@ export const login = async (req, res) => {
     // Password alone is enough for the login *attempt* to succeed, but not
     // enough to walk away with a usable token — that only happens after
     // /auth/verify-otp confirms the emailed code.
-    if (user.role === 'ADMIN') {
+    if (user.role === 'ADMIN' && ADMIN_OTP_ENABLED) {
       await issueLoginOtp(user);
       return sendSuccess(res, {
         otpRequired: true,

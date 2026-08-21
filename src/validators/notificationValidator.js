@@ -1,6 +1,6 @@
 // validators/notificationValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
 
@@ -8,7 +8,7 @@ export const validateNotificationCreate = [
   body('userId')
     .notEmpty().withMessage('User ID is required')
     .isInt({ min: 1 }).withMessage('Invalid user ID')
-    .custom(async (userId) => {
+    .custom(withSafeValidation(async (userId) => {
       const user = await prisma.user.findUnique({
         where: { id: parseInt(userId) },
       });
@@ -16,7 +16,7 @@ export const validateNotificationCreate = [
         throw new Error('User not found');
       }
       return true;
-    }),
+    })),
 
   body('message')
     .trim()
@@ -57,7 +57,7 @@ export const validateNotificationUpdate = [
 export const validateMarkAsRead = [
   param('id')
     .isInt().withMessage('Invalid notification ID')
-    .custom(async (id, { req }) => {
+    .custom(withSafeValidation(async (id, { req }) => {
       const notification = await prisma.notification.findUnique({
         where: { id: parseInt(id) },
       });
@@ -72,7 +72,7 @@ export const validateMarkAsRead = [
       }
 
       return true;
-    }),
+    })),
 
   handleValidationErrors,
 ];

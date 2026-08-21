@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import bcrypt from 'bcrypt';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 const stripPassword = (user) => {
   if (!user) return user;
   const { password, ...safe } = user;
@@ -24,7 +25,7 @@ export async function createUserHandler(req, res) {
     return sendSuccess(res, stripPassword(user), 201, 'User created');
   } catch (err) {
     if (err.code === 'P2002') return sendError(res, 'Email already in use', 409);
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -37,7 +38,7 @@ export async function getUserHandler(req, res) {
     if (!user) return sendError(res, 'User not found', 404);
     return sendSuccess(res, stripPassword(user));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -49,7 +50,7 @@ export async function getUsersHandler(req, res) {
     const users = await prisma.user.findMany({ skip, take });
     return sendSuccess(res, users.map(stripPassword));
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -73,7 +74,7 @@ export async function updateUserHandler(req, res) {
     return sendSuccess(res, stripPassword(user));
   } catch (err) {
     if (err.code === 'P2002') return sendError(res, 'Email already in use', 409);
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -88,7 +89,7 @@ export async function updateUserRoleHandler(req, res) {
     const user = await prisma.user.update({ where: { id }, data: { role } });
     return sendSuccess(res, stripPassword(user), 200, 'Role updated');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -98,7 +99,7 @@ export async function deleteUserHandler(req, res) {
     await prisma.user.delete({ where: { id } });
     return sendSuccess(res, null, 200, 'User deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 }
 
@@ -118,7 +119,7 @@ export const updateGoogleTokens = async (req, res) => {
     });
     return sendSuccess(res, stripPassword(updatedUser), 200, 'Google tokens updated successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -133,6 +134,6 @@ export const disconnectGoogleCalendar = async (req, res) => {
     });
     return sendSuccess(res, stripPassword(updatedUser), 200, 'Google Calendar disconnected successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

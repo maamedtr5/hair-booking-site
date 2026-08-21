@@ -3,12 +3,13 @@ import { prisma } from '../lib/prisma.js';
 import reviewModel from '../models/review.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 export const createReview = async (req, res) => {
   try {
     const review = await reviewModel.createReview(req.body);
     return sendSuccess(res, review, 201);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -18,7 +19,7 @@ export const getReview = async (req, res) => {
     if (!review) return sendError(res, 'Review not found', 404);
     return sendSuccess(res, review);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -42,7 +43,7 @@ export const getReviews = async (req, res) => {
 
     return sendSuccess(res, reviews);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -51,7 +52,7 @@ export const updateReview = async (req, res) => {
     const review = await reviewModel.updateReview(parseInt(req.params.id), req.body);
     return sendSuccess(res, review);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -60,6 +61,6 @@ export const deleteReview = async (req, res) => {
     await reviewModel.deleteReview(parseInt(req.params.id));
     return sendSuccess(res, null, 200, 'Review deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

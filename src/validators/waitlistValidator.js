@@ -1,6 +1,6 @@
 // validators/waitlistValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors, isFutureDate } from './validationHelpers.js';
+import { handleValidationErrors, isFutureDate, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
 
@@ -8,7 +8,7 @@ export const validateWaitlistCreate = [
   body('clientId')
     .notEmpty().withMessage('Client ID is required')
     .isInt({ min: 1 }).withMessage('Invalid client ID')
-    .custom(async (clientId) => {
+    .custom(withSafeValidation(async (clientId) => {
       const client = await prisma.client.findUnique({
         where: { id: parseInt(clientId) },
       });
@@ -16,12 +16,12 @@ export const validateWaitlistCreate = [
         throw new Error('Client not found');
       }
       return true;
-    }),
+    })),
 
   body('serviceId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid service ID')
-    .custom(async (serviceId) => {
+    .custom(withSafeValidation(async (serviceId) => {
       if (serviceId) {
         const service = await prisma.service.findUnique({
           where: { id: parseInt(serviceId) },
@@ -31,7 +31,7 @@ export const validateWaitlistCreate = [
         }
       }
       return true;
-    }),
+    })),
 
   body('preferredDate')
     .optional({ nullable: true })

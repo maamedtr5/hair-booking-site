@@ -1,13 +1,13 @@
 // validators/staffValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';   
 
 export const validateStaffCreate = [
   body('userId')
     .notEmpty().withMessage('User ID is required')
     .isInt({ min: 1 }).withMessage('Invalid user ID')
-    .custom(async (userId) => {
+    .custom(withSafeValidation(async (userId) => {
       const user = await prisma.user.findUnique({ where: { id: parseInt(userId) } });
       if (!user) {
         throw new Error('User not found');
@@ -16,7 +16,7 @@ export const validateStaffCreate = [
         throw new Error('User must have STAFF or ADMIN role');
       }
       return true;
-    }),
+    })),
 
   body('bio')
     .optional()

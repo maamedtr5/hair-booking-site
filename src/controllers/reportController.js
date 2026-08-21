@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 // Revenue report — daily breakdown over an optional date range.
 // Shape matches RevenueReportData on the frontend exactly:
 // { totalRevenue, currency, breakdown: [{ date, amount, bookings }] }
@@ -30,7 +31,7 @@ export const getRevenueReportHandler = async (req, res) => {
 
     return sendSuccess(res, { totalRevenue, currency: 'GHS', breakdown });
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -64,6 +65,6 @@ export const getTopServicesReportHandler = async (req, res) => {
 
     return sendSuccess(res, { services: ranked });
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

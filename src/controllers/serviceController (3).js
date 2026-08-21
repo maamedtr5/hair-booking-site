@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import serviceModel from '../models/service.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 // Create a new service
 export const createService = async (req, res) => {
   try {
@@ -10,7 +11,7 @@ export const createService = async (req, res) => {
     return sendSuccess(res, service, 201);
   } catch (error) {
     console.error('Error creating service:', error);
-    return sendError(res, error.message, 400);
+    return sendError(res, safeErrorMessage(error), 400);
   }
 };
 
@@ -27,7 +28,7 @@ export const getService = async (req, res) => {
     return sendSuccess(res, service);
   } catch (error) {
     console.error('Error fetching service:', error);
-    return sendError(res, error.message, 400);
+    return sendError(res, safeErrorMessage(error), 400);
   }
 };
 
@@ -47,7 +48,7 @@ export const getServices = async (req, res) => {
     return sendSuccess(res, services);
   } catch (error) {
     console.error('Error fetching services:', error);
-    return sendError(res, error.message, 400);
+    return sendError(res, safeErrorMessage(error), 400);
   }
 };
 
@@ -60,7 +61,7 @@ export const updateService = async (req, res) => {
     return sendSuccess(res, service);
   } catch (error) {
     console.error('Error updating service:', error);
-    return sendError(res, error.message, 400);
+    return sendError(res, safeErrorMessage(error), 400);
   }
 };
 
@@ -73,6 +74,6 @@ export const deleteService = async (req, res) => {
     return sendSuccess(res, null, 200, 'Service deleted successfully');
   } catch (error) {
     console.error('Error deleting service:', error);
-    return sendError(res, error.message, 400);
+    return sendError(res, safeErrorMessage(error), 400);
   }
 };

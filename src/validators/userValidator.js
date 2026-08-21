@@ -1,6 +1,6 @@
 // validators/userValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors, isStrongPassword } from './validationHelpers.js';
+import { handleValidationErrors, isStrongPassword, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
 
@@ -16,13 +16,13 @@ export const validateUserRegistration = [
     .notEmpty().withMessage('Email is required')
     .isEmail().withMessage('Must be a valid email address')
     .normalizeEmail()
-    .custom(async (email) => {
+    .custom(withSafeValidation(async (email) => {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser) {
         throw new Error('Email already registered');
       }
       return true;
-    }),
+    })),
 
   body('password')
     .notEmpty().withMessage('Password is required')
@@ -102,13 +102,13 @@ export const validateUserUpdate = [
     .trim()
     .isEmail().withMessage('Must be a valid email address')
     .normalizeEmail()
-    .custom(async (email, { req }) => {
+    .custom(withSafeValidation(async (email, { req }) => {
       const existingUser = await prisma.user.findUnique({ where: { email } });
       if (existingUser && existingUser.id !== parseInt(req.params.id)) {
         throw new Error('Email already in use');
       }
       return true;
-    }),
+    })),
 
   body('password')
     .optional()
@@ -196,13 +196,13 @@ export const validateGoogleTokenUpdate = [
 export const validateGoogleDisconnect = [
   param('id')
     .isInt().withMessage('Invalid user ID')
-    .custom(async (id, { req }) => {
+    .custom(withSafeValidation(async (id, { req }) => {
       // User can only disconnect their own calendar unless admin
       if (req.user.role !== 'ADMIN' && req.user.id !== parseInt(id)) {
         throw new Error('You can only disconnect your own Google Calendar');
       }
       return true;
-    }),
+    })),
 
   handleValidationErrors,
 ];                                                                                                                                                                                                                                                                                                                                                                            

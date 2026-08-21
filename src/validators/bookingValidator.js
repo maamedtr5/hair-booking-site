@@ -1,6 +1,6 @@
 // validators/bookingValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
 
@@ -8,7 +8,7 @@ export const validateBookingCreate = [
   body('appointmentId')
     .notEmpty().withMessage('Appointment ID is required')
     .isInt({ min: 1 }).withMessage('Invalid appointment ID')
-    .custom(async (appointmentId) => {
+    .custom(withSafeValidation(async (appointmentId) => {
       const appointment = await prisma.appointment.findUnique({
         where: { id: parseInt(appointmentId) },
       });
@@ -25,12 +25,12 @@ export const validateBookingCreate = [
       }
       
       return true;
-    }),
+    })),
 
   body('clientId')
     .notEmpty().withMessage('Client ID is required')
     .isInt({ min: 1 }).withMessage('Invalid client ID')
-    .custom(async (clientId) => {
+    .custom(withSafeValidation(async (clientId) => {
       const client = await prisma.client.findUnique({
         where: { id: parseInt(clientId) },
       });
@@ -38,7 +38,7 @@ export const validateBookingCreate = [
         throw new Error('Client not found');
       }
       return true;
-    }),
+    })),
 
   body('userId')
     .optional()
@@ -47,7 +47,7 @@ export const validateBookingCreate = [
   body('promocodeId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid promocode ID')
-    .custom(async (promocodeId) => {
+    .custom(withSafeValidation(async (promocodeId) => {
       if (promocodeId) {
         const promocode = await prisma.promocode.findUnique({
           where: { id: parseInt(promocodeId) },
@@ -65,7 +65,7 @@ export const validateBookingCreate = [
         }
       }
       return true;
-    }),
+    })),
 
   body('status')
     .optional()
@@ -85,7 +85,7 @@ export const validateBookingUpdate = [
   body('promocodeId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid promocode ID')
-    .custom(async (promocodeId) => {
+    .custom(withSafeValidation(async (promocodeId) => {
       if (promocodeId) {
         const promocode = await prisma.promocode.findUnique({
           where: { id: parseInt(promocodeId) },
@@ -103,7 +103,7 @@ export const validateBookingUpdate = [
         }
       }
       return true;
-    }),
+    })),
 
   handleValidationErrors,
 ];

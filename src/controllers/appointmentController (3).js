@@ -4,6 +4,7 @@ import { sendEmail } from '../services/emailService.js';
 import { sendAppointmentReminderSMS } from '../services/smsService.js';
 import { resolveClientForRequest } from '../services/guestClientService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { safeErrorMessage } from '../utils/errorMessages.js';
 import {
   NON_BLOCKING_STATUSES,
   hasStylistCapacity,
@@ -346,7 +347,7 @@ export const createAppointment = async (req, res) => {
       console.error('Unhandled error in appointment controller:', err);
       return sendError(res, 'Something went wrong. Please try again.', 500);
     }
-    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
+    return sendError(res, safeErrorMessage(err), err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -378,7 +379,7 @@ export const getAppointment = async (req, res) => {
 
     return sendSuccess(res, appointment);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -403,7 +404,7 @@ export const getAppointments = async (req, res) => {
     });
     return sendSuccess(res, appointments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -549,7 +550,7 @@ export const updateAppointment = async (req, res) => {
       console.error('Unhandled error in appointment controller:', err);
       return sendError(res, 'Something went wrong. Please try again.', 500);
     }
-    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
+    return sendError(res, safeErrorMessage(err), err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -572,7 +573,7 @@ export const getUnclaimedAppointments = async (req, res) => {
     });
     return sendSuccess(res, appointments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -658,7 +659,7 @@ export const claimAppointment = async (req, res) => {
       console.error('Unhandled error in appointment controller:', err);
       return sendError(res, 'Something went wrong. Please try again.', 500);
     }
-    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
+    return sendError(res, safeErrorMessage(err), err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -704,7 +705,7 @@ export const deleteAppointment = async (req, res) => {
 
     return sendSuccess(res, result, 200, 'Appointment cancelled');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -733,7 +734,7 @@ export const markAppointmentNoShow = async (req, res) => {
     });
     return sendSuccess(res, result, 200, 'Appointment marked as no-show');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -755,7 +756,7 @@ export const getAppointmentsByClient = async (req, res) => {
     });
     return sendSuccess(res, appointments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -771,7 +772,7 @@ export const getAppointmentsByStaff = async (req, res) => {
     });
     return sendSuccess(res, appointments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -788,7 +789,7 @@ export const getAppointmentsByDate = async (req, res) => {
     });
     return sendSuccess(res, appointments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -801,7 +802,7 @@ export const getAppointmentsByStatus = async (req, res) => {
     });
     return sendSuccess(res, appointments);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -864,7 +865,7 @@ export const bulkCancelAppointments = async (req, res) => {
 
     return sendSuccess(res, { count: appointmentIds.length }, 200, 'Appointments cancelled and clients notified');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -939,7 +940,7 @@ export const rescheduleAppointment = async (req, res) => {
       console.error('Unhandled error in appointment controller:', err);
       return sendError(res, 'Something went wrong. Please try again.', 500);
     }
-    return sendError(res, err.message, err.status, err.code ? { code: err.code } : {});
+    return sendError(res, safeErrorMessage(err), err.status, err.code ? { code: err.code } : {});
   }
 };
 
@@ -960,7 +961,7 @@ export const scheduleAppointmentReminder = async (req, res) => {
 
     return sendSuccess(res, { appointmentId: appointment.id }, 200, 'Reminder scheduled successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -973,7 +974,7 @@ export const cancelAppointmentReminder = async (req, res) => {
 
     return sendSuccess(res, { appointmentId: id }, 200, 'Reminder cancelled successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -983,6 +984,6 @@ export const getQueueStats = async (req, res) => {
     const stats = await fetchStats();
     return sendSuccess(res, stats);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

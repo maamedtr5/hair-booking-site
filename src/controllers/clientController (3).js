@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma.js';
 import clientModel from '../models/client.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 const isStaffOrAdmin = (role) => ['ADMIN', 'STAFF'].includes(role);
 
 export const getClient = async (req, res) => {
@@ -16,7 +17,7 @@ export const getClient = async (req, res) => {
     }
     return sendSuccess(res, client);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -32,7 +33,7 @@ export const getClients = async (req, res) => {
     });
     return sendSuccess(res, clients);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -53,7 +54,7 @@ export const updateClient = async (req, res) => {
     const client = await clientModel.updateClient(id, data);
     return sendSuccess(res, client);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -63,6 +64,6 @@ export const deleteClient = async (req, res) => {
     await clientModel.deleteClient(parseInt(req.params.id, 10));
     return sendSuccess(res, null, 200, 'Client deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

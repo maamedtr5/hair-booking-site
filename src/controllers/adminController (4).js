@@ -2,13 +2,14 @@
 import { prisma } from '../lib/prisma.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
+import { safeErrorMessage } from '../utils/errorMessages.js';
 //   Create admin
 export const createAdminHandler = async (req, res) => {
   try {
     const admin = await prisma.admin.create({ data: req.body });
     return sendSuccess(res, admin, 201); //   201 Created for new resource
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -22,7 +23,7 @@ export const getAdminHandler = async (req, res) => {
     if (!admin) return sendError(res, 'Admin not found', 404);
     return sendSuccess(res, admin);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -41,7 +42,7 @@ export const getAdminsHandler = async (req, res) => {
 
     return sendSuccess(res, admins);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -54,7 +55,7 @@ export const updateAdminHandler = async (req, res) => {
     });
     return sendSuccess(res, admin);
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };
 
@@ -64,6 +65,6 @@ export const deleteAdminHandler = async (req, res) => {
     await prisma.admin.delete({ where: { id: parseInt(req.params.id) } });
     return sendSuccess(res, null, 200, 'Admin deleted successfully');
   } catch (err) {
-    return sendError(res, err.message, 400);
+    return sendError(res, safeErrorMessage(err), 400);
   }
 };

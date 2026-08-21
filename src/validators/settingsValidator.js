@@ -1,6 +1,6 @@
                                                                                                                                                                                                                                                                                                                                                                                                                         // validators/settingsValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 
 import { prisma } from '../lib/prisma.js';
 
@@ -51,7 +51,7 @@ export const validateSettingsCreate = [
     .notEmpty().withMessage('Settings key is required')
     .isLength({ min: 2, max: 100 }).withMessage('Key must be between 2 and 100 characters')
     .matches(/^[a-z0-9_]+$/).withMessage('Key can only contain lowercase letters, numbers, and underscores')
-    .custom(async (key) => {
+    .custom(withSafeValidation(async (key) => {
       const existing = await prisma.settings.findUnique({
         where: { key },
       });
@@ -59,7 +59,7 @@ export const validateSettingsCreate = [
         throw new Error('Settings key already exists. Use update instead.');
       }
       return true;
-    }),
+    })),
 
   body('value')
     .notEmpty().withMessage('Settings value is required')
@@ -93,23 +93,27 @@ export const validateSettingsUpdate = [
 
   body('value')
     .optional()
-    .custom(async (value, { req }) => {
-  try {
-    const settings = await prisma.settings.findUnique({
-      where: { id: parseInt(req.params.id, 10) },
-    });
+    .custom(withSafeValidation(async (value, { req }) => {
+      const settings = await prisma.settings.findUnique({
+        where: { id: parseInt(req.params.id, 10) },
+      });
 
-    const parsedValue =
-      typeof value === "string" ? JSON.parse(value) : value;
+      // Only JSON.parse needs its own local catch — that failure is about
+      // the user's own submitted value and is safe/useful to name
+      // specifically. The prisma call above deliberately sits outside this
+      // try/catch: if it fails, withSafeValidation (wrapping this whole
+      // function) is what turns that into a generic message, rather than
+      // this block laundering a raw Prisma error into a "deliberate"-
+      // looking Error via string concatenation.
+      let parsedValue;
+      try {
+        parsedValue = typeof value === 'string' ? JSON.parse(value) : value;
+      } catch {
+        throw new Error('Settings value must be valid JSON.');
+      }
 
-    return validateSettingsValue(settings?.key || "", parsedValue);
-  } catch (error) {
-    throw new Error(
-      "Settings value must be valid JSON: " + error.message,
-      { cause: error }
-    );
-  }
-}),
+      return validateSettingsValue(settings?.key || '', parsedValue);
+    })),
 
   body('description')
     .optional()
