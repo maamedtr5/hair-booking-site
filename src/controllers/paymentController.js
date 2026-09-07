@@ -85,7 +85,13 @@ export const getPaymentQuote = async (req, res) => {
 // exists and isn't SUCCESS, we re-initialize it in place instead of trying
 // to insert a duplicate.
 export const initializePayment = async (req, res) => {
-  const { bookingId, method, provider, metadata } = req.body;
+  // The frontend (BookingPage.tsx) currently sends `email` as a top-level
+  // field, not nested under `metadata` — accept both shapes so a client
+  // update on either side doesn't silently break the other. `metadata.email`
+  // wins if both are somehow present, since that was the original contract.
+  const { bookingId, method, provider, metadata, email: bodyEmail } = req.body;
+  const paymentEmail = metadata?.email || bodyEmail;
+  const normalizedMetadata = { ...metadata, email: paymentEmail };
 
   try {
     if (!provider) {
@@ -114,7 +120,7 @@ export const initializePayment = async (req, res) => {
       return sendError(res, 'This booking has already been paid for.', 409);
     }
 
-    const response = await handlePayment(provider, amountDue, metadata);
+    const response = await handlePayment(provider, amountDue, normalizedMetadata);
 
     const paymentData = {
       amount: amountDue,
@@ -123,7 +129,7 @@ export const initializePayment = async (req, res) => {
       status: 'PENDING',
       transactionRef: response.reference,
       externalId: response.externalId,
-      metadata: { ...metadata, isDeposit },
+      metadata: { ...normalizedMetadata, isDeposit },
       errorMessage: null,
     };
 
