@@ -1,6 +1,6 @@
 // src/controllers/bookingController.js
-import { prisma } from '../lib/prisma.js'; // was missing â€” GET /bookings 500'd on every call
-import bookingModel from '../models/booking.js';
+import { prisma } from '../lib/prisma.js'; // was missing â€?GET /bookings 500'd on every call
+import bookingModel from '../models/Booking.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';
@@ -18,8 +18,8 @@ function sanitizeBooking(booking) {
   return safe;
 }
 
-// Staff/admin only (route-level) â€” manual booking for an existing appointment.
-// Only these are validated by validateBookingCreate â€” anything else in
+// Staff/admin only (route-level) â€?manual booking for an existing appointment.
+// Only these are validated by validateBookingCreate â€?anything else in
 // the body must not reach Prisma. `data: req.body` previously spread the
 // raw payload straight into `booking.create`, which was harmless with
 // today's frontend caller but a real mass-assignment risk the moment any

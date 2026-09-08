@@ -1,6 +1,6 @@
 // controllers/reviewController.js
 import { prisma } from '../lib/prisma.js';
-import reviewModel from '../models/review.js';
+import reviewModel from '../models/Review.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';

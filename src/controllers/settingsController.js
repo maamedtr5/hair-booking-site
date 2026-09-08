@@ -1,5 +1,5 @@
 // controllers/settingsController.js
-import settingsModel from '../models/settings.js';
+import settingsModel from '../models/Settings.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { safeErrorMessage } from '../utils/errorMessages.js';
 import {
@@ -53,7 +53,7 @@ export const getSettingByKey = async (req, res) => {
 };
 
 // Get all settings. Was calling prisma.setting (singular) directly, which
-// doesn't exist on the client — the model is `Settings` (plural), so this
+// doesn't exist on the client �?the model is `Settings` (plural), so this
 // threw on every request. Also dropped the orderBy: it referenced a
 // createdAt field the Settings model doesn't have (only updatedAt).
 export const getSettings = async (req, res) => {
@@ -83,7 +83,7 @@ export const deleteSetting = async (req, res) => {
   }
 };
 
-// ── Business hours — dedicated, friendlier endpoints on top of the
+// ── Business hours �?dedicated, friendlier endpoints on top of the
 // generic Settings key-value store, so the frontend doesn't need to know
 // about the underlying key/value shape. ──────────────────────────────────
 
@@ -109,7 +109,7 @@ export const getBusinessHoursDefaults = async (_req, res) => {
   return sendSuccess(res, DEFAULT_BUSINESS_HOURS);
 };
 
-// ── Payment policy — deposit-at-booking configuration ─────────────────
+// ── Payment policy �?deposit-at-booking configuration ─────────────────
 
 export const getPaymentPolicy = async (req, res) => {
   try {
@@ -133,7 +133,7 @@ export const getPaymentPolicyDefaults = async (_req, res) => {
   return sendSuccess(res, DEFAULT_PAYMENT_POLICY);
 };
 
-// ── Salon location — address, map coordinates, and admin-authored
+// ── Salon location �?address, map coordinates, and admin-authored
 // getting-here notes (e.g. which trotro routes to take or avoid) shown
 // on the public site's "Getting Here" section. ──────────────────────────
 
@@ -159,7 +159,7 @@ export const getSalonLocationDefaults = async (_req, res) => {
   return sendSuccess(res, DEFAULT_SALON_LOCATION);
 };
 
-// ── Business info — name, phone, email shown to clients (and, for name,
+// ── Business info �?name, phone, email shown to clients (and, for name,
 // used as the "From" display name on outgoing emails). ─────────────────
 
 export const getBusinessInfo = async (req, res) => {

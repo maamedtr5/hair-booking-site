@@ -1,6 +1,6 @@
 // controllers/promocodeController.js
 import { prisma } from '../lib/prisma.js';
-import promocodeModel from '../models/promocode.js';
+import promocodeModel from '../models/PromoCode.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';
@@ -44,7 +44,7 @@ export const getPromocodes = async (req, res) => {
     const promocodes = await prisma.promocode.findMany({
       skip,
       take,
-      orderBy: { id: 'desc' }, // newest first â€” Promocode has no createdAt column
+      orderBy: { id: 'desc' }, // newest first â€?Promocode has no createdAt column
     });
 
     return sendSuccess(res, promocodes);

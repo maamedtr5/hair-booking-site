@@ -1,7 +1,7 @@
 // controllers/formController.js
 
 import { prisma } from '../lib/prisma.js';
-import formModel from '../models/form.js';
+import formModel from '../models/Form.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';
