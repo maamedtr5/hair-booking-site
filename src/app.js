@@ -68,11 +68,25 @@ app.use(helmet());
 app.use(compression());
 
 // Only the frontend origin(s) may call this API with credentials.
-// Set FRONTEND_URL in .env (comma-separated for multiple, e.g. staging).
-const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',');
+// Accepts either FRONTEND_URL or FRONTEND_URLS (comma-separated) in .env —
+// this previously only read FRONTEND_URL (singular), so a .env using
+// FRONTEND_URLS (plural, as this project's actually does) was silently
+// ignored and every origin fell back to the hardcoded localhost:5173
+// default. Any origin not in that list — including a second local dev
+// port, a staging domain, etc. — was rejected with no indication of
+// which origin actually failed.
+const allowedOrigins = (process.env.FRONTEND_URL || process.env.FRONTEND_URLS || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    // Log which origin was actually rejected — a bare "Not allowed by
+    // CORS" gives no way to tell a genuine misconfiguration in
+    // allowedOrigins apart from an unexpected/unauthorized caller.
+    console.warn(`CORS rejected origin "${origin}" — allowed: [${allowedOrigins.join(', ')}]`);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,

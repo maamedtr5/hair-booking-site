@@ -24,6 +24,17 @@ const router = express.Router();
 
 router.post('/', authenticate, requireRole('ADMIN'), validateUserRegistration, createUserHandler);
 
+// Must come BEFORE '/:id' — Express matches routes in registration order,
+// so without this, GET /users/me was falling through to the '/:id' handler
+// with req.params.id === "me". parseInt("me", 10) is NaN, and Prisma's
+// validator treats a NaN id as effectively missing, which is exactly the
+// "Argument `id` is missing" crash this was producing. This route resolves
+// "me" to the authenticated user's own id instead of trusting a URL param.
+router.get('/me', authenticate, (req, res) => {
+  req.params.id = String(req.user.id);
+  return getUserHandler(req, res);
+});
+
 router.get('/:id', authenticate, getUserHandler); // ownership/admin check inside controller
 router.get('/', authenticate, requireRole('ADMIN', 'STAFF'), getUsersHandler);
 router.put('/:id', authenticate, validateUserUpdate, updateUserHandler); // ownership check inside controller

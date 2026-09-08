@@ -54,7 +54,7 @@ async function main() {
   await prisma.user.create({
     data: {
       name: 'Abena Owusu',
-      email: 'admin@locsallure.com',
+      email: 'maameabenaadjabeng@gmail.com',
       password: defaultPassword,
       role: 'ADMIN',
       admin: { create: { department: 'Operations', permissions: { manageUsers: true, manageBookings: true, viewReports: true } } },
@@ -317,7 +317,7 @@ async function main() {
   console.log('✓ Created settings');
 
   console.log('\nDone. Login with any seeded email + password "Password123!":');
-  console.log('  Admin:  maameabenaadjabeng@gmail.com');
+  console.log('  Admin:   maameabenaadjabeng@gmail.com');
   console.log('  Staff:   efua.stylist@locsallure.com / kwame.stylist@locsallure.com');
   console.log('  Clients: adjoa.client@example.com / kojo.client@example.com / ama.client@example.com');
 }
