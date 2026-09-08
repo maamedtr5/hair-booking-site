@@ -1,6 +1,6 @@
 // src/controllers/clientController.js
 import { prisma } from '../lib/prisma.js';
-import clientModel from '../models/client.js';
+import clientModel from '../models/Client.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';
