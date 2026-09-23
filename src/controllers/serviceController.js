@@ -32,17 +32,20 @@ export const getService = async (req, res) => {
   }
 };
 
-// Get all services (with skip/take pagination)
+// Get all services (with skip/take pagination). Optional ?categoryId=
+// filter for pages that only need one category's sub-options.
 export const getServices = async (req, res) => {
   try {
     const skip = parseInt(req.query.skip) || 0;
     const take = parseInt(req.query.take) || 500;
+    const categoryId = req.query.categoryId ? parseInt(req.query.categoryId, 10) : undefined;
 
     const services = await prisma.service.findMany({
+      where: categoryId ? { categoryId } : undefined,
       skip,
       take,
-      include: { appointments: true },
-      orderBy: { createdAt: 'desc' },
+      include: { appointments: true, category: true },
+      orderBy: [{ categoryId: 'asc' }, { displayOrder: 'asc' }],
     });
 
     return sendSuccess(res, services);

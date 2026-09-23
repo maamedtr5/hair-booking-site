@@ -42,6 +42,12 @@ async function main() {
   await prisma.promocode.deleteMany();
   await prisma.settings.deleteMany();
   await prisma.service.deleteMany();
+  // Service rows must be gone first (Service.categoryId is ON DELETE
+  // RESTRICT). FormField cascades from FormTemplate automatically, but is
+  // cleared explicitly here for clarity.
+  await prisma.formField.deleteMany();
+  await prisma.formTemplate.deleteMany();
+  await prisma.serviceCategory.deleteMany();
   await prisma.staff.deleteMany();
   await prisma.client.deleteMany();
   await prisma.admin.deleteMany();
@@ -118,50 +124,211 @@ async function main() {
 
   console.log('✓ Created 1 admin, 2 staff, 3 clients (all passwords: Password123!)');
 
-  // ── 3. Services ────────────────────────────────────────────────────────
+  // ── 3. SCALP-FIRST™ consultation form + service categories ────────────
+  // A representative subset of the client's actual SCALP-FIRST intake —
+  // enough to demonstrate every supported field type. The full 57-question
+  // version is entered/edited by admin via the form builder, not hardcoded
+  // here — that's the whole point of making it admin-customizable.
+  const scalpFirstForm = await prisma.formTemplate.create({
+    data: {
+      name: 'SCALP-FIRST™ New Loc Consultation & Loc System Assessment',
+      description:
+        'A precision intake for choosing the right loc system — hair, scalp, lifestyle, and maintenance capacity, required before any Starter Locs booking.',
+      isActive: true,
+      fields: {
+        create: [
+          // Section 1 — Client Information
+          { section: 'Client Information', label: 'Full Name', fieldType: 'TEXT', required: true, order: 0 },
+          { section: 'Client Information', label: 'Phone / WhatsApp', fieldType: 'TEXT', required: true, order: 1 },
+          { section: 'Client Information', label: 'Email', fieldType: 'TEXT', required: true, order: 2 },
+          { section: 'Client Information', label: 'Date of Consultation', fieldType: 'DATE', required: true, order: 3 },
+          {
+            section: 'Client Information', label: 'Age Range', fieldType: 'SINGLE_SELECT', required: true, order: 4,
+            options: ['Under 18', '18–24', '25–34', '35–44', '45–54', '55+'],
+          },
+          // Section 2 — Your Loc Journey
+          {
+            section: 'Your Loc Journey', label: 'What is your primary reason for wanting locs?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 5,
+            options: ['Personal expression', 'Convenience / easier hair management', 'Hair growth / length retention', 'Cultural connection', 'Spiritual reasons', 'Lifestyle change', 'Protective styling', 'I love the aesthetic', 'I want to stop chemically processing my hair', 'Other'],
+          },
+          {
+            section: 'Your Loc Journey', label: 'Have you had locs before?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 6,
+            options: ['No', 'Yes — once', 'Yes — multiple times'],
+          },
+          {
+            section: 'Your Loc Journey', label: 'What do you currently dislike or struggle with about your hair?',
+            fieldType: 'TEXTAREA', required: false, order: 7,
+          },
+          // Section 3 — Your Ideal Locs
+          {
+            section: 'Your Ideal Locs', label: 'What type of loc appearance are you most attracted to?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 8,
+            options: ['Very small / micro', 'Small', 'Medium', 'Large', 'Very large / freeform', "I'm unsure"],
+          },
+          {
+            section: 'Your Ideal Locs', label: 'How important is maximum styling versatility to you? (1 = not important, 5 = extremely important)',
+            fieldType: 'SCALE', required: true, order: 9,
+          },
+          {
+            section: 'Your Ideal Locs', label: 'Which loc systems are you currently considering?',
+            fieldType: 'MULTI_SELECT', required: false, order: 10,
+            options: ['Traditional Locs', 'Microlocs', 'Sisterlocks®', 'Freeform Locs', 'Semi-Freeform Locs', 'Interlocked Locs', 'Crochet Locs', "I don't know yet"],
+          },
+          // Section 4 — Hair History
+          {
+            section: 'Hair History', label: 'What is your natural hair texture?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 11,
+            options: ['Fine', 'Medium', 'Coarse', 'Unsure'],
+          },
+          {
+            section: 'Hair History', label: 'Does your hair break easily?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 12,
+            options: ['Never', 'Occasionally', 'Frequently', 'Very frequently', 'Unsure'],
+          },
+          // Section 5 — Chemical & Hair Treatment History
+          {
+            section: 'Chemical & Hair Treatment History', label: 'Have you chemically treated your hair? Select all that apply.',
+            fieldType: 'MULTI_SELECT', required: false, order: 13,
+            options: ['Never', 'Relaxer', 'Texturizer', 'Permanent colour', 'Bleach', 'Keratin / smoothing treatment'],
+          },
+          // Section 6 — Scalp Tolerance Index
+          {
+            section: 'Scalp Tolerance Index™', label: 'How does your scalp usually respond to tight hairstyles?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 14,
+            options: ['No discomfort', 'Mild discomfort', 'Noticeable soreness', 'Significant pain', 'I frequently develop bumps or irritation'],
+          },
+          {
+            section: 'Scalp Tolerance Index™', label: 'Have you ever removed a hairstyle because it was too painful?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 15,
+            options: ['No', 'Yes'],
+          },
+          {
+            section: 'Scalp Tolerance Index™', label: 'Is there anything about your scalp or hair your loctician should know before working on it?',
+            fieldType: 'TEXTAREA', required: false, order: 16,
+          },
+          // Section 9 — Lifestyle & Maintenance Capacity
+          {
+            section: 'Maintenance Capacity Index™', label: 'How much time are you realistically willing to spend maintaining your locs?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 17,
+            options: ['Very little', 'A small amount', 'Moderate amount', 'Significant amount', 'I enjoy spending time on my hair'],
+          },
+          {
+            section: 'Maintenance Capacity Index™', label: 'How frequently could you realistically attend professional maintenance appointments?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 18,
+            options: ['Every 4 weeks', 'Every 4–6 weeks', 'Every 6–8 weeks', 'Every 8–12 weeks', 'Only when necessary', 'Unsure'],
+          },
+          // Section 10 — Longevity Objective
+          {
+            section: 'Longevity Objective™', label: 'How long do you intend to keep your locs?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 19,
+            options: ["I'm experimenting", '1–2 years', '2–5 years', '5–10 years', 'Indefinitely', "I'm not sure yet"],
+          },
+          {
+            section: 'Longevity Objective™', label: 'How important is long-term scalp preservation to you? (1 = low priority, 5 = non-negotiable)',
+            fieldType: 'SCALE', required: true, order: 20,
+          },
+          // Section 13 — Budget & Commitment
+          {
+            section: 'Budget & Commitment', label: 'Which best describes your priority?',
+            fieldType: 'SINGLE_SELECT', required: true, order: 21,
+            options: ['Lowest initial cost', 'Balanced cost and maintenance', 'Investing more upfront for a highly customized system', 'Investing in the best long-term option regardless of initial cost'],
+          },
+          // Section 15 — Client Acknowledgement
+          {
+            section: 'Client Acknowledgement', label: 'Signature — I confirm the information provided is accurate to the best of my knowledge.',
+            fieldType: 'SIGNATURE', required: true, order: 22,
+          },
+        ],
+      },
+    },
+  });
+  console.log('✓ Created SCALP-FIRST™ consultation form (23 fields)');
+
+  const [starterLocsCategory, locsStylingCategory, retieServicesCategory] = await Promise.all([
+    prisma.serviceCategory.create({
+      data: {
+        name: 'Starter Locs',
+        slug: 'starter-locs',
+        description: 'New loc installations and starter systems.',
+        displayOrder: 1,
+        formTemplateId: scalpFirstForm.id,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        name: 'Locs Styling',
+        slug: 'locs-styling',
+        description: 'Styling services for established locs.',
+        displayOrder: 2,
+      },
+    }),
+    prisma.serviceCategory.create({
+      data: {
+        name: 'Retie Services',
+        slug: 'retie-services',
+        description: 'Retie and maintenance services for existing locs.',
+        displayOrder: 3,
+      },
+    }),
+  ]);
+  console.log('✓ Created 3 service categories (Starter Locs requires the SCALP-FIRST form)');
+
+  // ── 3b. Services (sub-options within each category) ───────────────────
   const [locRetwist, boxBraids, silkPress, , locStarter] = await Promise.all([
     prisma.service.create({
       data: {
+        categoryId: retieServicesCategory.id,
         name: 'Loc Retwist',
         description: 'Full retwist and style for established locs.',
         duration: 90,
         price: 150.0,
+        displayOrder: 0,
       },
     }),
     prisma.service.create({
       data: {
+        categoryId: locsStylingCategory.id,
         name: 'Box Braids',
         description: 'Protective style, medium size, shoulder length.',
         duration: 240,
         price: 350.0,
+        displayOrder: 0,
       },
     }),
     prisma.service.create({
       data: {
+        categoryId: locsStylingCategory.id,
         name: 'Silk Press',
         description: 'Heat styling for a smooth, silky finish on natural hair.',
         duration: 120,
         price: 200.0,
+        displayOrder: 1,
       },
     }),
     prisma.service.create({
       data: {
+        categoryId: locsStylingCategory.id,
         name: 'Deep Conditioning Treatment',
         description: 'Moisture-restoring treatment for dry or damaged hair.',
         duration: 60,
         price: 100.0,
+        displayOrder: 2,
       },
     }),
     prisma.service.create({
       data: {
+        categoryId: starterLocsCategory.id,
         name: 'Loc Starter (Sisterlocks)',
-        description: 'Consultation and installation for new sisterlocks.',
+        description: 'Consultation and installation for new sisterlocks. Requires the SCALP-FIRST consultation form.',
         duration: 300,
         price: 600.0,
+        displayOrder: 0,
       },
     }),
   ]);
-  console.log('✓ Created 5 services');
+  console.log('✓ Created 5 services across 3 categories');
 
   // ── 4. Appointments + Bookings (a spread of statuses) ─────────────────
   const appt1 = await prisma.appointment.create({

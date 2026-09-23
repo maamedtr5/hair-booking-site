@@ -1,8 +1,22 @@
 // validators/serviceValidator.js
 import { body, param } from 'express-validator';
-import { handleValidationErrors } from './validationHelpers.js';
+import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
+import { prisma } from '../lib/prisma.js';
+
+const validateCategoryExists = withSafeValidation(async (categoryId) => {
+  const category = await prisma.serviceCategory.findUnique({ where: { id: parseInt(categoryId, 10) } });
+  if (!category) {
+    throw new Error('Category not found');
+  }
+  return true;
+});
 
 export const validateServiceCreate = [
+  body('categoryId')
+    .notEmpty().withMessage('Category is required')
+    .isInt({ min: 1 }).withMessage('Invalid category')
+    .custom(validateCategoryExists),
+
   body('name')
     .trim()
     .notEmpty().withMessage('Service name is required')
@@ -31,12 +45,21 @@ export const validateServiceCreate = [
     .optional()
     .isBoolean().withMessage('isActive must be a boolean'),
 
+  body('displayOrder')
+    .optional()
+    .isInt({ min: 0, max: 10000 }).withMessage('Display order must be a non-negative whole number'),
+
   handleValidationErrors,
 ];
 
 export const validateServiceUpdate = [
   param('id')
     .isInt().withMessage('Invalid service ID'),
+
+  body('categoryId')
+    .optional()
+    .isInt({ min: 1 }).withMessage('Invalid category')
+    .custom(validateCategoryExists),
 
   body('name')
     .optional()
@@ -59,6 +82,10 @@ export const validateServiceUpdate = [
   body('isActive')
     .optional()
     .isBoolean().withMessage('isActive must be a boolean'),
+
+  body('displayOrder')
+    .optional()
+    .isInt({ min: 0, max: 10000 }).withMessage('Display order must be a non-negative whole number'),
 
   handleValidationErrors,
 ];

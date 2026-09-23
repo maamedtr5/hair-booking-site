@@ -5,6 +5,7 @@ import { sendAppointmentReminderSMS } from '../services/smsService.js';
 import { resolveClientForRequest } from '../services/guestClientService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { safeErrorMessage } from '../utils/errorMessages.js';
+import { validateAnswersAgainstTemplate } from '../utils/formAnswers.js';
 import {
   NON_BLOCKING_STATUSES,
   hasStylistCapacity,
@@ -12,9 +13,9 @@ import {
 } from '../utils/capacity.js';
 
 const FULL_INCLUDE = {
-  service: true,
+  service: { include: { category: true } },
   staff: { include: { user: true } },
-  booking: { include: { client: { include: { user: true } }, payment: true } },
+  booking: { include: { client: { include: { user: true } }, payment: true, form: true } },
 };
 
 // Generous upper bound on how long any single service could ever run.
@@ -194,7 +195,7 @@ function notifyPromotedClients(promoted) {
 // one call to "book now".
 export const createAppointment = async (req, res) => {
   try {
-    const { serviceId, staffId, date, notes, promoCode } = req.body;
+    const { serviceId, staffId, date, notes, promoCode, formAnswers } = req.body;
 
     // resolveClientForRequest now runs INSIDE the transaction below (it's
     // passed `tx`), not before it. Previously it ran here, ahead of
@@ -215,12 +216,29 @@ export const createAppointment = async (req, res) => {
       contactPhone = resolved.contactPhone;
       contactName = resolved.contactName;
 
-      const service = await tx.service.findUnique({ where: { id: parseInt(serviceId, 10) } });
+      const service = await tx.service.findUnique({
+        where: { id: parseInt(serviceId, 10) },
+        include: { category: { include: { formTemplate: { include: { fields: true } } } } },
+      });
       if (!service) {
         const err = new Error('Service not found');
         err.status = 404;
         throw err;
       }
+
+      // Security/business-logic gate: if this service's category requires
+      // a consultation form (e.g. SCALP-FIRST for Starter Locs), the
+      // client cannot book without it — validated here against the LIVE
+      // template, not whatever the frontend happened to render. A client
+      // that skips straight to this endpoint (or an out-of-date frontend
+      // build) can never bypass a required consultation.
+      const requiredTemplate =
+        service.category?.formTemplate && service.category.formTemplate.isActive
+          ? service.category.formTemplate
+          : null;
+      const consultationAnswers = requiredTemplate
+        ? validateAnswersAgainstTemplate(requiredTemplate.fields, formAnswers)
+        : null;
 
       const start = new Date(date);
       const end = new Date(start.getTime() + service.duration * 60000);
@@ -253,9 +271,22 @@ export const createAppointment = async (req, res) => {
           ...(initialStatus ? { status: initialStatus } : {}),
         },
       });
-      await tx.booking.create({
+      const booking = await tx.booking.create({
         data: { appointmentId: appointment.id, clientId, promocodeId },
       });
+
+      if (requiredTemplate) {
+        await tx.form.create({
+          data: {
+            clientId,
+            bookingId: booking.id,
+            title: requiredTemplate.name,
+            fields: consultationAnswers,
+            formTemplateId: requiredTemplate.id,
+          },
+        });
+      }
+
       return tx.appointment.findUnique({
         where: { id: appointment.id },
         include: FULL_INCLUDE,

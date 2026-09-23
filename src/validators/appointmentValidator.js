@@ -72,6 +72,16 @@ export const validateAppointmentCreate = [
     .optional()
     .isIn(['PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED']).withMessage('Invalid status'),
 
+  // Bounds the shape only — whether an answer set is actually REQUIRED for
+  // this particular service's category, and whether each answer matches
+  // that category's live consultation form, is checked in the controller
+  // (validateAnswersAgainstTemplate) inside the same transaction as the
+  // booking write, the same reasoning as promoCode above.
+  body('formAnswers')
+    .optional({ nullable: true })
+    .custom((value) => value === null || (typeof value === 'object' && !Array.isArray(value)))
+    .withMessage('formAnswers must be an object of fieldId -> answer'),
+
   // Google Calendar Event ID - managed internally, block direct updates
   body('googleEventId')
     .optional({ nullable: true })

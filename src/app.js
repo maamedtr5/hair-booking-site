@@ -27,6 +27,8 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import promocodeRoutes from './routes/promocodeRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
+import serviceCategoryRoutes from './routes/serviceCategoryRoutes.js';
+import formTemplateRoutes from './routes/formTemplateRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
@@ -204,6 +206,7 @@ app.get('/', (req, res) => {
       docs: '/api-docs', health: '/health', auth: '/auth', users: '/users',
       clients: '/clients', staff: '/staff', admin: '/admin',
       appointments: '/appointments', bookings: '/bookings', services: '/services',
+      serviceCategories: '/service-categories', formTemplates: '/form-templates',
       payments: '/payments', promocodes: '/promocodes', reviews: '/reviews',
       forms: '/forms', settings: '/settings', waitlist: '/waitlist',
       notifications: '/notifications', reports: '/reports', slots: '/slots',
@@ -227,6 +230,8 @@ app.use('/admin', adminRoutes);
 app.use('/appointments', appointmentRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/services', serviceRoutes);
+app.use('/service-categories', serviceCategoryRoutes);
+app.use('/form-templates', formTemplateRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/promocodes', promocodeRoutes);
 app.use('/reviews', reviewRoutes);
