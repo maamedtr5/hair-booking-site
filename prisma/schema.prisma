@@ -174,16 +174,20 @@ enum BookingStatus {
 }
 
 model Form {
-  id        Int      @id @default(autoincrement())
-  clientId  Int
-  bookingId Int?     @unique
-  title     String
-  fields    Json // flexible storage for dynamic form fields
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             Int      @id @default(autoincrement())
+  clientId       Int
+  bookingId      Int?     @unique
+  title          String
+  fields         Json // flexible storage: for a formTemplateId submission, answers keyed by FormField.id (as a string)
+  formTemplateId Int? // set when this Form is a submission of an admin-defined FormTemplate (e.g. a service-category consultation form)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  client  Client   @relation(fields: [clientId], references: [id])
-  booking Booking? @relation(fields: [bookingId], references: [id])
+  client       Client        @relation(fields: [clientId], references: [id])
+  booking      Booking?      @relation(fields: [bookingId], references: [id])
+  formTemplate FormTemplate? @relation(fields: [formTemplateId], references: [id])
+
+  @@index([formTemplateId])
 }
 
 model Payment {
@@ -258,17 +262,98 @@ enum DiscountType {
 
 model Service {
   id          Int      @id @default(autoincrement())
+  categoryId  Int
   name        String    
   description String?
   duration    Int 
   price       Float
   isActive    Boolean  @default(true)
+  displayOrder Int     @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  category     ServiceCategory @relation(fields: [categoryId], references: [id])
   appointments Appointment[]
   reviews      Review[]
   waitlists    Waitlist[]    @relation("ServiceWaitlist")
+
+  @@index([categoryId])
+}
+
+// A booking-page category such as "Locs Styling", "Retie Services", or
+// "Starter Locs" — each groups a set of concrete, chargeable Services
+// (the "sub-options" a client actually picks and pays for). Fully
+// admin-managed: name, description, ordering, and active state are all
+// editable via the admin dashboard, and services can be moved between
+// categories without losing their appointment/booking history.
+model ServiceCategory {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique
+  slug           String   @unique
+  description    String?
+  displayOrder   Int      @default(0)
+  isActive       Boolean  @default(true)
+  // Optional consultation/intake form (e.g. SCALP-FIRST) a client must
+  // complete before booking ANY service in this category. Null means no
+  // form is required. Admin-assignable independently of the form's own
+  // content, so the same template could later be reused across categories.
+  formTemplateId Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  formTemplate FormTemplate? @relation(fields: [formTemplateId], references: [id])
+  services     Service[]
+
+  @@index([formTemplateId])
+}
+
+// Admin-authored, fully customizable form definition — the "form builder"
+// behind a category's required consultation (e.g. SCALP-FIRST). Its
+// questions live in FormField, editable/reorderable independently of the
+// template itself, so admin changes here never require a deploy.
+model FormTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  fields      FormField[]
+  categories  ServiceCategory[]
+  submissions Form[]
+}
+
+// A single admin-editable question on a FormTemplate. `order` drives
+// display order within the template (and, when `section` is set, within
+// that section) so admin can freely reorder without touching code.
+model FormField {
+  id             Int           @id @default(autoincrement())
+  formTemplateId Int
+  section        String? // optional grouping heading, e.g. "Scalp Tolerance"
+  label          String
+  helpText       String?
+  fieldType      FormFieldType
+  options        Json? // choice labels for SINGLE_SELECT / MULTI_SELECT
+  required       Boolean       @default(false)
+  order          Int           @default(0)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  formTemplate FormTemplate @relation(fields: [formTemplateId], references: [id], onDelete: Cascade)
+
+  @@index([formTemplateId, order])
+}
+
+enum FormFieldType {
+  TEXT
+  TEXTAREA
+  SINGLE_SELECT
+  MULTI_SELECT
+  SCALE
+  DATE
+  CHECKBOX
+  SIGNATURE
 }
 
 model Settings {
