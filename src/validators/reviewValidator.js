@@ -3,9 +3,10 @@ import { body } from 'express-validator';
 import { handleValidationErrors } from './validationHelpers.js';
 
 export const validateReviewCreate = [
-  body('clientId')
-    .notEmpty().withMessage('Client ID is required')
-    .isInt({ min: 1 }).withMessage('Invalid client ID'),
+  // clientId is intentionally NOT accepted here — the reviewer is always
+  // the authenticated user's own Client record (see
+  // reviewController.resolveOwnClientId), never a value the client can
+  // set. Accepting it would let one client post a review "from" another.
 
   body('serviceId')
     .optional()
