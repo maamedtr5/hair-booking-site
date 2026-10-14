@@ -6,6 +6,8 @@ import {
   deleteWaitlistEntry
 } from '../models/waitlist.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { prisma } from '../lib/prisma.js';
+import { assertServiceBookable } from '../utils/serviceAvailability.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';
 // Utility: sanitize nested client data
@@ -24,7 +26,28 @@ function sanitizeWaitlist(waitlist) {
 
 export async function addToWaitlistHandler(req, res) {
   try {
-    const waitlist = await addToWaitlist(req.body);
+    // The waitlist entry always belongs to the CALLER. clientId used to be
+    // taken from the request body, so any client could waitlist (and spam
+    // notifications to) any other client; and the whole body was passed to
+    // Prisma, letting a caller set fields like `status` directly.
+    const client = await prisma.client.findUnique({ where: { userId: req.user.id } });
+    if (!client) return sendError(res, 'No client profile found for this account.', 403);
+
+    const { serviceId, preferredDate } = req.body;
+    const data = { clientId: client.id };
+
+    if (serviceId) {
+      const id = parseInt(serviceId, 10);
+      const service = await prisma.service.findUnique({
+        where: { id },
+        include: { category: { select: { isActive: true } } },
+      });
+      assertServiceBookable(service); // can't queue for something unbookable
+      data.serviceId = id;
+    }
+    if (preferredDate) data.preferredDate = new Date(preferredDate);
+
+    const waitlist = await addToWaitlist(data);
     return sendSuccess(res, sanitizeWaitlist(waitlist), 201);
   } catch (err) {
     return sendError(res, safeErrorMessage(err), 400);

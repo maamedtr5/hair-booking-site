@@ -19,6 +19,7 @@ async function resolveBookingAmount(bookingId) {
     include: {
       appointment: { include: { service: true } },
       promocode: true,
+      client: { include: { user: { select: { id: true, email: true } } } },
     },
   });
 
@@ -102,6 +103,26 @@ export const initializePayment = async (req, res) => {
     }
 
     const { booking, amountDue, isDeposit } = await resolveBookingAmount(bookingId);
+
+    // Ownership. bookingId is a small sequential integer and this route is
+    // guest-reachable, so without this anyone could re-initialize ANOTHER
+    // customer's PENDING/FAILED payment: the row's transactionRef is
+    // overwritten, so the victim's real Paystack success webhook then
+    // arrives for an "unknown reference" and is ignored — they paid, the
+    // booking never shows it. Allowed: the booking's own logged-in user,
+    // staff/admin, or a guest presenting the booking's contact email (what
+    // the booking page already sends as `email`).
+    const owner = booking.client?.user;
+    const role = String(req.user?.role || '').toUpperCase();
+    const isOwner = Boolean(req.user && owner && owner.id === req.user.id);
+    const isStaff = role === 'ADMIN' || role === 'STAFF';
+    const emailMatches = Boolean(
+      paymentEmail && owner?.email &&
+      String(paymentEmail).trim().toLowerCase() === owner.email.toLowerCase()
+    );
+    if (!isOwner && !isStaff && !emailMatches) {
+      return sendError(res, 'Not authorized to pay for this booking.', 403);
+    }
 
     if (booking.status === 'CANCELLED') {
       return sendError(res, 'This booking has been cancelled and can no longer be paid for.', 400);

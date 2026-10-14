@@ -28,6 +28,7 @@ import promocodeRoutes from './routes/promocodeRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import serviceCategoryRoutes from './routes/serviceCategoryRoutes.js';
+import serviceImageRoutes from './routes/serviceImageRoutes.js';
 import formTemplateRoutes from './routes/formTemplateRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import waitlistRoutes from './routes/waitlistRoutes.js';
@@ -175,10 +176,26 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: rateLimitKey,
-  skip: (req) => EXEMPT_FROM_GENERAL_LIMITER.has(req.path),
+  // Photos are served by their own, higher-ceiling limiter below: a single
+  // booking page can load a dozen+ card photos at once, and those must not
+  // eat the shared per-IP budget (carrier-grade NAT) that real API calls
+  // like slot lookups and login depend on.
+  skip: (req) => EXEMPT_FROM_GENERAL_LIMITER.has(req.path) || req.path.startsWith('/service-images/'),
   message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
 });
 app.use(apiLimiter);
+
+// Public, read-only, immutable-cached photos. Still capped (each hit is a
+// DB read of up to a few hundred KB) but with headroom for a full page of
+// cards per visitor, including several visitors behind one mobile IP.
+const serviceImageLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(req.ip),
+  message: { success: false, message: 'Too many requests. Please slow down and try again shortly.' },
+});
 
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path}`);
@@ -206,7 +223,7 @@ app.get('/', (req, res) => {
       docs: '/api-docs', health: '/health', auth: '/auth', users: '/users',
       clients: '/clients', staff: '/staff', admin: '/admin',
       appointments: '/appointments', bookings: '/bookings', services: '/services',
-      serviceCategories: '/service-categories', formTemplates: '/form-templates',
+      serviceCategories: '/service-categories', formTemplates: '/form-templates', serviceImages: '/service-images',
       payments: '/payments', promocodes: '/promocodes', reviews: '/reviews',
       forms: '/forms', settings: '/settings', waitlist: '/waitlist',
       notifications: '/notifications', reports: '/reports', slots: '/slots',
@@ -231,6 +248,7 @@ app.use('/appointments', appointmentRoutes);
 app.use('/bookings', bookingRoutes);
 app.use('/services', serviceRoutes);
 app.use('/service-categories', serviceCategoryRoutes);
+app.use('/service-images', serviceImageLimiter, serviceImageRoutes);
 app.use('/form-templates', formTemplateRoutes);
 app.use('/payments', paymentRoutes);
 app.use('/promocodes', promocodeRoutes);

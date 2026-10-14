@@ -1,5 +1,6 @@
 // models/serviceCategory.js
 import { prisma } from '../lib/prisma.js';
+import serviceImageModel from './serviceImage.js';
 
 const PUBLIC_SERVICE_WHERE = { isActive: true };
 
@@ -78,7 +79,14 @@ async function updateCategory(id, data) {
 }
 
 async function deleteCategory(id) {
-  return prisma.serviceCategory.delete({ where: { id } });
+  const existing = await prisma.serviceCategory.findUnique({ where: { id }, select: { imageId: true } });
+  const deleted = await prisma.serviceCategory.delete({ where: { id } });
+  try {
+    await serviceImageModel.deleteIfUnreferenced(existing?.imageId);
+  } catch (err) {
+    console.error('Orphaned category image cleanup failed:', err.message);
+  }
+  return deleted;
 }
 
 async function countServicesInCategory(id) {

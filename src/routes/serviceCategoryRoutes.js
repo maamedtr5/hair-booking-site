@@ -10,6 +10,8 @@ import {
 import { authenticate } from '../auth/authMiddleware.js';
 import { optionalAuth } from '../middleware/optionalAuth.js';
 import { requireRole } from '../middleware/roleMiddleware.js';
+import { uploadSingleImage } from '../middleware/imageUpload.js';
+import { makeUploadImageHandler, makeDeleteImageHandler } from '../controllers/serviceImageController.js';
 import {
   validateCategoryCreate,
   validateCategoryUpdate,
@@ -27,5 +29,23 @@ router.get('/:id', optionalAuth, validateCategoryIdParam, getCategory);
 router.post('/', authenticate, requireRole('admin'), validateCategoryCreate, createCategory);
 router.put('/:id', authenticate, requireRole('admin'), validateCategoryUpdate, updateCategory);
 router.delete('/:id', authenticate, requireRole('admin'), validateCategoryIdParam, deleteCategory);
+
+// Cover photo (Admin only). authenticate + requireRole run BEFORE the
+// multipart parser so guests can never make the server buffer an upload.
+router.post(
+  '/:id/image',
+  authenticate,
+  requireRole('admin'),
+  validateCategoryIdParam,
+  uploadSingleImage,
+  makeUploadImageHandler('category')
+);
+router.delete(
+  '/:id/image',
+  authenticate,
+  requireRole('admin'),
+  validateCategoryIdParam,
+  makeDeleteImageHandler('category')
+);
 
 export default router;

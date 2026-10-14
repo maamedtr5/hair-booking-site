@@ -4,6 +4,13 @@ import serviceModel from '../models/service.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 
 import { safeErrorMessage } from '../utils/errorMessages.js';
+
+// Routes use optionalAuth, so req.user only exists for a valid session.
+// Guests (the public booking page) must only ever see services that are
+// bookable: the service itself AND its category must be active. Admins see
+// everything so the dashboard can manage hidden items.
+const isAdmin = (req) => req.user?.role?.toUpperCase() === 'ADMIN';
+
 // Create a new service
 export const createService = async (req, res) => {
   try {
@@ -21,7 +28,9 @@ export const getService = async (req, res) => {
     const id = parseInt(req.params.id);
     const service = await serviceModel.getServiceById(id);
 
-    if (!service) {
+    // Same 404 for "missing" and "hidden" so guests can't probe for
+    // inactive services by ID.
+    if (!service || (!isAdmin(req) && !(service.isActive && service.category?.isActive))) {
       return sendError(res, 'Service not found', 404);
     }
 
@@ -40,11 +49,18 @@ export const getServices = async (req, res) => {
     const take = parseInt(req.query.take) || 500;
     const categoryId = req.query.categoryId ? parseInt(req.query.categoryId, 10) : undefined;
 
+    // NOTE: appointments are deliberately NOT included. This endpoint is
+    // public, and appointment rows carry private data (notes, calendar
+    // event ids, client/booking linkage). Nothing on the client reads them
+    // from here.
     const services = await prisma.service.findMany({
-      where: categoryId ? { categoryId } : undefined,
+      where: {
+        ...(categoryId ? { categoryId } : {}),
+        ...(isAdmin(req) ? {} : { isActive: true, category: { isActive: true } }),
+      },
       skip,
       take,
-      include: { appointments: true, category: true },
+      include: { category: true },
       orderBy: [{ categoryId: 'asc' }, { displayOrder: 'asc' }],
     });
 

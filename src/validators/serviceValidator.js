@@ -1,5 +1,5 @@
 // validators/serviceValidator.js
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { handleValidationErrors, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -87,5 +87,17 @@ export const validateServiceUpdate = [
     .optional()
     .isInt({ min: 0, max: 10000 }).withMessage('Display order must be a non-negative whole number'),
 
+  handleValidationErrors,
+];
+
+export const validateServiceIdParam = [
+  param('id').isInt({ min: 1, max: 2147483647 }).withMessage('Invalid service ID'),
+  handleValidationErrors,
+];
+
+export const validateServiceListQuery = [
+  query('categoryId').optional().isInt({ min: 1, max: 2147483647 }).withMessage('Invalid category'),
+  query('skip').optional().isInt({ min: 0, max: 100000 }).withMessage('Invalid skip value'),
+  query('take').optional().isInt({ min: 1, max: 500 }).withMessage('take must be between 1 and 500'),
   handleValidationErrors,
 ];

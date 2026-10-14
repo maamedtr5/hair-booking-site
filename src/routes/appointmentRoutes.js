@@ -7,6 +7,7 @@ import { requireRole } from '../middleware/roleMiddleware.js';
 import {
   validateAppointmentCreate,
   validateAppointmentUpdate,
+  validateAppointmentReschedule,
   validateBulkCancel,
   validateInternalAppointmentUpdate,
 } from '../validators/appointmentValidator.js';
@@ -26,7 +27,7 @@ router.get('/:id', optionalAuth, appointmentController.getAppointment);
 // optionalAuth attaches req.user when a token is present but never blocks.
 // Guests must include guestName/guestEmail/guestPhone in the body instead.
 router.post('/', optionalAuth, validateAppointmentCreate, appointmentController.createAppointment);
-router.post('/:id/reschedule', optionalAuth, appointmentController.rescheduleAppointment);
+router.post('/:id/reschedule', optionalAuth, validateAppointmentReschedule, appointmentController.rescheduleAppointment);
 
 // --- Sensitive: staff/admin only from here down ---
 router.get('/queue/unclaimed', authenticate, requireRole('ADMIN', 'STAFF'), appointmentController.getUnclaimedAppointments);

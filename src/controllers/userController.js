@@ -71,6 +71,22 @@ export async function updateUserHandler(req, res) {
     if (password !== undefined) data.password = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.update({ where: { id }, data });
+
+    // A new password/email must end every OTHER session. Otherwise a stolen
+    // session survives the victim "changing their password" and the attacker
+    // stays logged in. The caller's own session is kept so they aren't kicked
+    // out of the change they just made.
+    if (password !== undefined || email !== undefined) {
+      await prisma.session.updateMany({
+        where: {
+          userId: id,
+          revokedAt: null,
+          ...(req.user.id === id && req.sessionId ? { id: { not: req.sessionId } } : {}),
+        },
+        data: { revokedAt: new Date() },
+      });
+    }
+
     return sendSuccess(res, stripPassword(user));
   } catch (err) {
     if (err.code === 'P2002') return sendError(res, 'Email already in use', 409);
@@ -87,6 +103,15 @@ export async function updateUserRoleHandler(req, res) {
       return sendError(res, 'Invalid role', 400);
     }
     const user = await prisma.user.update({ where: { id }, data: { role } });
+
+    // The role is baked into the user's JWT, so without this a demoted admin
+    // keeps admin rights until their token expires (up to 24h). Revoking
+    // forces a fresh login that carries the new role.
+    await prisma.session.updateMany({
+      where: { userId: id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
     return sendSuccess(res, stripPassword(user), 200, 'Role updated');
   } catch (err) {
     return sendError(res, safeErrorMessage(err), 400);

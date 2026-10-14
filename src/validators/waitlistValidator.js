@@ -2,22 +2,13 @@
 import { body, param } from 'express-validator';
 import { handleValidationErrors, isFutureDate, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
+import { assertServiceBookable } from '../utils/serviceAvailability.js';
 
 
+// NOTE: no clientId and no status here on purpose — the controller derives
+// the client from the authenticated session and the status always starts
+// PENDING. Anything a caller sends for those is ignored.
 export const validateWaitlistCreate = [
-  body('clientId')
-    .notEmpty().withMessage('Client ID is required')
-    .isInt({ min: 1 }).withMessage('Invalid client ID')
-    .custom(withSafeValidation(async (clientId) => {
-      const client = await prisma.client.findUnique({
-        where: { id: parseInt(clientId) },
-      });
-      if (!client) {
-        throw new Error('Client not found');
-      }
-      return true;
-    })),
-
   body('serviceId')
     .optional()
     .isInt({ min: 1 }).withMessage('Invalid service ID')
@@ -25,10 +16,9 @@ export const validateWaitlistCreate = [
       if (serviceId) {
         const service = await prisma.service.findUnique({
           where: { id: parseInt(serviceId) },
+          include: { category: { select: { isActive: true } } },
         });
-        if (!service) {
-          throw new Error('Service not found');
-        }
+        assertServiceBookable(service);
       }
       return true;
     })),
@@ -42,10 +32,6 @@ export const validateWaitlistCreate = [
       }
       return true;
     }),
-
-  body('status')
-    .optional()
-    .isIn(['PENDING', 'NOTIFIED', 'BOOKED', 'CANCELLED']).withMessage('Invalid waitlist status'),
 
   handleValidationErrors,
 ];

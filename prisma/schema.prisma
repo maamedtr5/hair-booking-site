@@ -269,15 +269,19 @@ model Service {
   price       Float
   isActive    Boolean  @default(true)
   displayOrder Int     @default(0)
+  // Optional admin-uploaded photo. Null => UI shows a placeholder.
+  imageId     Int?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   category     ServiceCategory @relation(fields: [categoryId], references: [id])
+  image        ServiceImage?   @relation(fields: [imageId], references: [id], onDelete: SetNull)
   appointments Appointment[]
   reviews      Review[]
   waitlists    Waitlist[]    @relation("ServiceWaitlist")
 
   @@index([categoryId])
+  @@index([imageId])
 }
 
 // A booking-page category such as "Locs Styling", "Retie Services", or
@@ -298,13 +302,35 @@ model ServiceCategory {
   // form is required. Admin-assignable independently of the form's own
   // content, so the same template could later be reused across categories.
   formTemplateId Int?
+  // Optional admin-uploaded cover photo. Null => UI shows a placeholder.
+  imageId        Int?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   formTemplate FormTemplate? @relation(fields: [formTemplateId], references: [id])
+  image        ServiceImage? @relation(fields: [imageId], references: [id], onDelete: SetNull)
   services     Service[]
 
   @@index([formTemplateId])
+  @@index([imageId])
+}
+
+// Admin-uploaded photo for a Service or ServiceCategory. Stored already
+// validated, re-encoded to WebP and metadata-stripped (see
+// services/imageService.js), so what's in `data` is never the raw upload.
+// Rows are immutable: replacing a photo creates a new row, which is what
+// lets the image endpoint be served with long-lived immutable caching.
+model ServiceImage {
+  id        Int      @id @default(autoincrement())
+  data      Bytes
+  mimeType  String   @default("image/webp")
+  width     Int
+  height    Int
+  byteSize  Int
+  createdAt DateTime @default(now())
+
+  services   Service[]
+  categories ServiceCategory[]
 }
 
 // Admin-authored, fully customizable form definition — the "form builder"

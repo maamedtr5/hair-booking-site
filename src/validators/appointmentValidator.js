@@ -3,6 +3,7 @@ import { body, param } from 'express-validator';
 import { handleValidationErrors, isFutureDate, withSafeValidation } from './validationHelpers.js';
 import { prisma } from '../lib/prisma.js';
 import { getBusinessHoursConfig, isWithinBusinessHours } from '../utils/businessHours.js';
+import { assertServiceBookable } from '../utils/serviceAvailability.js';
 
 
 export const validateAppointmentCreate = [
@@ -10,15 +11,14 @@ export const validateAppointmentCreate = [
     .notEmpty().withMessage('Service ID is required')
     .isInt({ min: 1 }).withMessage('Invalid service ID')
     .custom(withSafeValidation(async (serviceId) => {
-      const service = await prisma.service.findUnique({ 
-        where: { id: parseInt(serviceId) } 
+      // Friendly early rejection. The authoritative check runs again inside
+      // the booking transaction (createAppointment), so a service or
+      // category deactivated between here and the write is still caught.
+      const service = await prisma.service.findUnique({
+        where: { id: parseInt(serviceId) },
+        include: { category: { select: { isActive: true } } },
       });
-      if (!service) {
-        throw new Error('Service not found');
-      }
-      if (!service.isActive) {
-        throw new Error('Service is not available');
-      }
+      assertServiceBookable(service);
       return true;
     })),
 
@@ -215,6 +215,40 @@ export const validateAppointmentUpdate = [
       }
       return true;
     }),
+
+  handleValidationErrors,
+];
+
+// POST /appointments/:id/reschedule is reachable by guests (optionalAuth),
+// so it must hold the new time to the same rules as a brand-new booking.
+// It previously had no validation at all: a client could "reschedule" into
+// the past, outside business hours, or send garbage that reached Prisma.
+export const validateAppointmentReschedule = [
+  param('id')
+    .isInt({ min: 1 }).withMessage('Invalid appointment ID'),
+
+  body('newDate')
+    .notEmpty().withMessage('A new date is required')
+    .isISO8601().withMessage('Invalid date format (use ISO 8601)')
+    .custom((value) => {
+      if (!isFutureDate(value)) {
+        throw new Error('Appointment date must be in the future');
+      }
+      return true;
+    })
+    .custom(withSafeValidation(async (value) => {
+      const config = await getBusinessHoursConfig();
+      if (!isWithinBusinessHours(new Date(value), config)) {
+        throw new Error('Appointment must be during business hours');
+      }
+      return true;
+    })),
+
+  // Guest ownership proof (matched against the booking contact email).
+  body('email')
+    .optional({ nullable: true })
+    .isString().withMessage('Invalid email')
+    .isLength({ max: 254 }).withMessage('Invalid email'),
 
   handleValidationErrors,
 ];

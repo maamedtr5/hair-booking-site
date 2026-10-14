@@ -5,6 +5,7 @@ import { sendAppointmentReminderSMS } from '../services/smsService.js';
 import { resolveClientForRequest } from '../services/guestClientService.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { safeErrorMessage } from '../utils/errorMessages.js';
+import { assertServiceBookable } from '../utils/serviceAvailability.js';
 import { validateAnswersAgainstTemplate } from '../utils/formAnswers.js';
 import {
   NON_BLOCKING_STATUSES,
@@ -220,11 +221,11 @@ export const createAppointment = async (req, res) => {
         where: { id: parseInt(serviceId, 10) },
         include: { category: { include: { formTemplate: { include: { fields: true } } } } },
       });
-      if (!service) {
-        const err = new Error('Service not found');
-        err.status = 404;
-        throw err;
-      }
+      // Authoritative, race-free check (same transaction as the write): the
+      // service AND its category must be active. The validator already
+      // rejects this early, but a service or category deactivated between
+      // validation and commit must not slip through.
+      assertServiceBookable(service);
 
       // Security/business-logic gate: if this service's category requires
       // a consultation form (e.g. SCALP-FIRST for Starter Locs), the
@@ -464,13 +465,21 @@ export const updateAppointment = async (req, res) => {
       }
     }
 
+    // JSON bodies can carry ids as numeric strings; compare as integers.
+    if (updateData.serviceId !== undefined) {
+      updateData.serviceId = parseInt(updateData.serviceId, 10);
+    }
+
     const previous = await prisma.appointment.findUnique({ where: { id } });
 
     const updated = await withConflictCheck(async (tx) => {
-      // Only re-check availability if this update actually touches the
-      // time or the assigned staff member — a status/notes-only edit
-      // shouldn't pay the conflict-check cost or risk a false 409.
-      if (updateData.date || updateData.staffId !== undefined) {
+      const touchesSchedule = Boolean(updateData.date) || updateData.staffId !== undefined;
+      const touchesService = updateData.serviceId !== undefined;
+
+      // Only do the lookup + conflict check when this update can actually
+      // change what time/stylist/duration the appointment occupies — a
+      // status/notes-only edit shouldn't pay that cost or risk a false 409.
+      if (touchesSchedule || touchesService) {
         const existing = await tx.appointment.findUnique({
           where: { id },
           include: { service: true },
@@ -481,16 +490,36 @@ export const updateAppointment = async (req, res) => {
           throw err;
         }
 
-        const staffId =
-          updateData.staffId !== undefined
-            ? updateData.staffId
-              ? parseInt(updateData.staffId, 10)
-              : null
-            : existing.staffId;
-        const start = updateData.date ? new Date(updateData.date) : existing.date;
-        const end = new Date(start.getTime() + existing.service.duration * 60000);
+        // A service CHANGE must land on a bookable service (active, in an
+        // active category). Re-sending the appointment's CURRENT service is
+        // not a change, so appointments on a since-deactivated service stay
+        // editable (mark complete, add notes, move the time, ...).
+        const serviceChanged = touchesService && updateData.serviceId !== existing.serviceId;
+        let service = existing.service;
+        if (serviceChanged) {
+          service = await tx.service.findUnique({
+            where: { id: updateData.serviceId },
+            include: { category: true },
+          });
+          assertServiceBookable(service);
+        }
 
-        await assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId: id });
+        // Re-check availability whenever the time, stylist OR the service
+        // changes. A different service means a different duration, which can
+        // newly overlap the next appointment; and the end time must use the
+        // NEW service's duration, not the old one's.
+        if (touchesSchedule || serviceChanged) {
+          const staffId =
+            updateData.staffId !== undefined
+              ? updateData.staffId
+                ? parseInt(updateData.staffId, 10)
+                : null
+              : existing.staffId;
+          const start = updateData.date ? new Date(updateData.date) : existing.date;
+          const end = new Date(start.getTime() + service.duration * 60000);
+
+          await assertSlotAvailable(tx, { staffId, start, end, excludeAppointmentId: id });
+        }
       }
 
       // Confirming a "no preference" booking no longer force-assigns a
@@ -902,6 +931,8 @@ export const bulkCancelAppointments = async (req, res) => {
 
 // Guests may reschedule their own appointment via ?email= matching the
 // booking's contact email; logged-in users need to own it or be staff/admin.
+const RESCHEDULABLE_STATUSES = new Set(['PENDING', 'CONFIRMED', 'RESCHEDULED']);
+
 export const rescheduleAppointment = async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -924,6 +955,18 @@ export const rescheduleAppointment = async (req, res) => {
       if (!isOwner && !isStaffOrAdmin && !emailMatches) {
         const err = new Error('Not authorized to reschedule this appointment');
         err.status = 403;
+        throw err;
+      }
+
+      // Only a live appointment can be moved. Without this, rescheduling a
+      // CANCELLED / COMPLETED / NO_SHOW appointment silently revived it
+      // (status flipped to RESCHEDULED, slot re-held), and a WAITLISTED one
+      // has no slot to move yet. Checked AFTER authorization so an
+      // unauthorized caller can't learn an appointment's status.
+      if (!RESCHEDULABLE_STATUSES.has(existing.status)) {
+        const err = new Error('This appointment can no longer be rescheduled.');
+        err.status = 409;
+        err.code = 'APPOINTMENT_NOT_RESCHEDULABLE';
         throw err;
       }
 

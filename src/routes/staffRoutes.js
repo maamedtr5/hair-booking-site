@@ -2,6 +2,7 @@
 import express from 'express';
 import * as staffController from '../controllers/staffController.js';
 import { authenticate } from '../auth/authMiddleware.js';
+import { optionalAuth } from '../middleware/optionalAuth.js';
 import { requireRole } from '../middleware/roleMiddleware.js';
 import { validateStaffCreate, validateStaffUpdate } from '../validators/staffValidator.js';
 
@@ -10,8 +11,10 @@ const router = express.Router();
 // Public: clients need to see the stylist directory (name/bio) to pick
 // one when booking. sendSuccess() strips the nested user.password
 // centrally, so this is safe to leave open.
-router.get('/:id', staffController.getStaffHandler);
-router.get('/', staffController.getStaffsHandler);
+// optionalAuth: guests/clients get the minimal public shape; a valid
+// staff/admin session gets the full record (see staffController).
+router.get('/:id', optionalAuth, staffController.getStaffHandler);
+router.get('/', optionalAuth, staffController.getStaffsHandler);
 
 // Create/update/delete staff profiles is admin-only management, not just
 // "any logged-in user" — these previously only required `authenticate`
